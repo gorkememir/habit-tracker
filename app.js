@@ -28,3 +28,9 @@ const initDb = async () => {
     console.error("DB Init Error:", err);
   }
 };
+
+const path = require('path');
+
+// Tell express exactly where the views folder is
+app.set('views', path.join(__dirname, 'views'));
+app.set('view engine', 'ejs');

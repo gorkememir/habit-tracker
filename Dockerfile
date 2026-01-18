@@ -1,10 +1,11 @@
 FROM node:18-slim
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies (including ejs)
+COPY package*.json ./
 RUN npm install express pg ejs
 
-# Copy the views folder and the app.js file
+# IMPORTANT: This copies EVERYTHING (including the views folder)
 COPY . . 
 
 EXPOSE 8080
