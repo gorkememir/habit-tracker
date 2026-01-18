@@ -31,6 +31,6 @@ const initDb = async () => {
 
 const path = require('path');
 
-// Tell express exactly where the views folder is
+// Explicitly set the views directory
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');

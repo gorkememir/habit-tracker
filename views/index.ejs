@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K8s Habit Tracker</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: #f0f2f5; 
+            display: flex; 
+            justify-content: center; 
+            padding: 50px 20px; 
+        }
+        .card { 
+            background: white; 
+            padding: 2rem; 
+            border-radius: 12px; 
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1); 
+            width: 100%;
+            max-width: 400px; 
+        }
+        h2 { color: #1c1e21; margin-top: 0; text-align: center; }
+        input { 
+            width: 100%; 
+            padding: 12px; 
+            margin-bottom: 12px; 
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-sizing: border-box; 
+        }
+        .btn-add { 
+            width: 100%; 
+            padding: 12px; 
+            background: #28a745; 
+            color: white; 
+            border: none; 
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer; 
+            transition: background 0.2s;
+        }
+        .btn-add:hover { background: #218838; }
+        ul { list-style: none; padding: 0; margin-top: 20px; }
+        li { 
+            background: #fff;
+            border-bottom: 1px solid #eee; 
+            padding: 12px 0; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+        }
+        li:last-child { border-bottom: none; }
+        .habit-info strong { display: block; color: #333; }
+        .habit-info small { color: #777; font-size: 0.75rem; }
+        .btn-done { 
+            background: #dc3545; 
+            color: white; 
+            border: none; 
+            padding: 6px 12px; 
+            border-radius: 4px; 
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        .btn-done:hover { background: #c82333; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Habit Tracker</h2>
+        
+        <form action="/add" method="POST">
+            <input type="text" name="habitName" placeholder="Enter a new habit..." required>
+            <button type="submit" class="btn-add">Add Habit</button>
+        </form>
+
+        <ul>
+            <% if (habits.length === 0) { %>
+                <p style="text-align: center; color: #999;">No habits tracked yet. Start today!</p>
+            <% } %>
+
+            <% habits.forEach(habit => { %>
+                <li>
+                    <div class="habit-info">
+                        <strong><%= habit.name %></strong>
+                        <small><%= new Date(habit.created_at).toLocaleString() %></small>
+                    </div>
+                    
+                    <form action="/delete/<%= habit.id %>" method="POST" style="margin: 0;">
+                        <button type="submit" class="btn-done">Done</button>
+                    </form>
+                </li>
+            <% }) %>
+        </ul>
+    </div>
+</body>
+</html>
