@@ -1,6 +1,11 @@
 FROM node:18-slim
 WORKDIR /app
-RUN npm install express pg  # <--- Added 'pg' here
-COPY app.js .
+
+# Install dependencies
+RUN npm install express pg ejs
+
+# Copy the views folder and the app.js file
+COPY . . 
+
 EXPOSE 8080
 CMD ["node", "app.js"]
