@@ -324,6 +324,52 @@ app.get('/api/history/:id', async (req, res) => {
   }
 });
 
+// Get calendar data for a specific month
+app.get('/api/calendar', async (req, res) => {
+  const { year, month } = req.query;
+  
+  if (!year || !month) {
+    return res.status(400).json({ error: 'Year and month are required' });
+  }
+  
+  const yearNum = parseInt(year);
+  const monthNum = parseInt(month);
+  
+  if (isNaN(yearNum) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+    return res.status(400).json({ error: 'Invalid year or month' });
+  }
+  
+  try {
+    // Get all completions for the month with habit names
+    const startDate = `${yearNum}-${String(monthNum).padStart(2, '0')}-01`;
+    const endDate = `${yearNum}-${String(monthNum).padStart(2, '0')}-${new Date(yearNum, monthNum, 0).getDate()}`;
+    
+    const result = await pool.query(
+      `SELECT c.completed_date, h.name 
+       FROM completions c 
+       JOIN habits h ON c.habit_id = h.id 
+       WHERE c.completed_date >= $1 AND c.completed_date <= $2 
+       ORDER BY c.completed_date, h.name`,
+      [startDate, endDate]
+    );
+    
+    // Group by date
+    const calendarData = {};
+    result.rows.forEach(row => {
+      const dateStr = row.completed_date;
+      if (!calendarData[dateStr]) {
+        calendarData[dateStr] = [];
+      }
+      calendarData[dateStr].push(row.name);
+    });
+    
+    res.json(calendarData);
+  } catch (err) {
+    console.error('Error fetching calendar data:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // Export to CSV
 app.get('/export', async (req, res) => {
   try {

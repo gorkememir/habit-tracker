@@ -355,6 +355,128 @@
                 opacity: 0;
             }
         }
+        
+        .calendar-container {
+            margin-top: 2rem;
+        }
+        
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .calendar-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .calendar-nav {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .calendar-nav-btn {
+            background: transparent;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 6px 12px;
+            cursor: pointer;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        
+        .calendar-nav-btn:hover {
+            border-color: var(--input-focus);
+            transform: scale(1.05);
+        }
+        
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+        
+        .calendar-day-header {
+            text-align: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            padding: 8px 4px;
+        }
+        
+        .calendar-day {
+            aspect-ratio: 1;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 4px;
+            position: relative;
+            min-height: 60px;
+            background: var(--card-bg);
+            transition: all 0.2s;
+        }
+        
+        .calendar-day:hover {
+            border-color: var(--input-focus);
+            transform: scale(1.02);
+        }
+        
+        .calendar-day.other-month {
+            opacity: 0.3;
+        }
+        
+        .calendar-day.today {
+            border: 2px solid var(--input-focus);
+            background: linear-gradient(135deg, #667eea10 0%, #764ba210 100%);
+        }
+        
+        .calendar-day-number {
+            font-size: 0.8rem;
+            color: var(--text-primary);
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+        
+        .calendar-dots {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+            justify-content: center;
+        }
+        
+        .calendar-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+        }
+        
+        .habit-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+        
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+        }
     </style>
 </head>
 <body>
@@ -363,6 +485,7 @@
             <div class="header">
                 <h2>🎯 Habit Tracker</h2>
                 <div class="controls">
+                    <button class="theme-toggle" onclick="toggleCalendar()" title="Toggle Calendar">📅</button>
                     <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">🌓</button>
                     <a href="/export" class="export-btn" title="Export to CSV">📥</a>
                 </div>
@@ -394,8 +517,30 @@
                     <button type="submit" class="btn-add">+ Add Habit</button>
                 </form>
             </div>
+            
+            <div id="calendarView" class="calendar-container" style="display: none;">
+                <div class="calendar-header">
+                    <h3 class="calendar-title" id="calendarTitle">January 2026</h3>
+                    <div class="calendar-nav">
+                        <button class="calendar-nav-btn" onclick="previousMonth()">◀ Prev</button>
+                        <button class="calendar-nav-btn" onclick="currentMonth()">Today</button>
+                        <button class="calendar-nav-btn" onclick="nextMonth()">Next ▶</button>
+                    </div>
+                </div>
+                <div class="calendar-grid">
+                    <div class="calendar-day-header">Sun</div>
+                    <div class="calendar-day-header">Mon</div>
+                    <div class="calendar-day-header">Tue</div>
+                    <div class="calendar-day-header">Wed</div>
+                    <div class="calendar-day-header">Thu</div>
+                    <div class="calendar-day-header">Fri</div>
+                    <div class="calendar-day-header">Sat</div>
+                    <div id="calendarDays"></div>
+                </div>
+                <div class="habit-legend" id="habitLegend"></div>
+            </div>
 
-            <ul>
+            <ul id="habitList">
                 <% if (habits.length === 0) { %>
                     <div class="empty-state">
                         <div style="font-size: 4rem; margin-bottom: 1rem;">🎯</div>
@@ -542,6 +687,139 @@
                 }
             });
         });
+        
+        // Calendar functionality
+        let currentCalendarDate = new Date();
+        let calendarData = {};
+        
+        async function loadCalendarData(year, month) {
+            try {
+                const response = await fetch(`/api/calendar?year=${year}&month=${month + 1}`);
+                calendarData = await response.json();
+                renderCalendar();
+            } catch (err) {
+                console.error('Error loading calendar data:', err);
+            }
+        }
+        
+        function renderCalendar() {
+            const year = currentCalendarDate.getFullYear();
+            const month = currentCalendarDate.getMonth();
+            
+            // Update title
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'];
+            document.getElementById('calendarTitle').textContent = `${monthNames[month]} ${year}`;
+            
+            // Calculate calendar grid
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const daysInMonth = lastDay.getDate();
+            const startDayOfWeek = firstDay.getDay();
+            
+            // Get previous month days
+            const prevMonthLastDay = new Date(year, month, 0).getDate();
+            
+            const daysContainer = document.getElementById('calendarDays');
+            daysContainer.innerHTML = '';
+            
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
+            
+            // Previous month days
+            for (let i = startDayOfWeek - 1; i >= 0; i--) {
+                const day = prevMonthLastDay - i;
+                const dayEl = document.createElement('div');
+                dayEl.className = 'calendar-day other-month';
+                dayEl.innerHTML = `<div class="calendar-day-number">${day}</div>`;
+                daysContainer.appendChild(dayEl);
+            }
+            
+            // Current month days
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dayEl = document.createElement('div');
+                dayEl.className = 'calendar-day';
+                
+                if (dateStr === todayStr) {
+                    dayEl.classList.add('today');
+                }
+                
+                let html = `<div class="calendar-day-number">${day}</div>`;
+                
+                if (calendarData[dateStr] && calendarData[dateStr].length > 0) {
+                    html += '<div class="calendar-dots">';
+                    calendarData[dateStr].forEach(() => {
+                        html += '<div class="calendar-dot"></div>';
+                    });
+                    html += '</div>';
+                }
+                
+                dayEl.innerHTML = html;
+                dayEl.title = calendarData[dateStr] ? calendarData[dateStr].join(', ') : 'No completions';
+                daysContainer.appendChild(dayEl);
+            }
+            
+            // Next month days
+            const totalCells = daysContainer.children.length;
+            const remainingCells = 35 - totalCells; // 5 weeks
+            for (let day = 1; day <= remainingCells; day++) {
+                const dayEl = document.createElement('div');
+                dayEl.className = 'calendar-day other-month';
+                dayEl.innerHTML = `<div class="calendar-day-number">${day}</div>`;
+                daysContainer.appendChild(dayEl);
+            }
+            
+            // Render legend
+            renderLegend();
+        }
+        
+        function renderLegend() {
+            const legend = document.getElementById('habitLegend');
+            const allHabits = new Set();
+            
+            Object.values(calendarData).forEach(habits => {
+                habits.forEach(habit => allHabits.add(habit));
+            });
+            
+            if (allHabits.size === 0) {
+                legend.innerHTML = '<div class="legend-item" style="color: var(--text-secondary);">No completions this month</div>';
+                return;
+            }
+            
+            legend.innerHTML = Array.from(allHabits).map(habit => 
+                `<div class="legend-item"><div class="legend-dot"></div>${habit}</div>`
+            ).join('');
+        }
+        
+        function toggleCalendar() {
+            const calendarView = document.getElementById('calendarView');
+            const habitList = document.getElementById('habitList');
+            
+            if (calendarView.style.display === 'none') {
+                calendarView.style.display = 'block';
+                habitList.style.display = 'none';
+                loadCalendarData(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth());
+            } else {
+                calendarView.style.display = 'none';
+                habitList.style.display = 'block';
+            }
+        }
+        
+        function previousMonth() {
+            currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
+            loadCalendarData(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth());
+        }
+        
+        function nextMonth() {
+            currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
+            loadCalendarData(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth());
+        }
+        
+        function currentMonth() {
+            currentCalendarDate = new Date();
+            loadCalendarData(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth());
+        }
     </script>
 </body>
 </html>
