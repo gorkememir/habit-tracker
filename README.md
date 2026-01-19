@@ -144,7 +144,6 @@ habit-tracker/
 
 ## Environment
 
-- **Production URL**: http://192.168.2.234:30007
 - **Kubernetes**: Self-hosted on Proxmox
 - **Docker Registry**: Docker Hub (gorkememir/habit-tracker)
 
