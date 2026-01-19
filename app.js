@@ -36,6 +36,14 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
+// Helper function to get local date in YYYY-MM-DD format
+function getLocalDate(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // 3. DATABASE INITIALIZATION (Self-Healing Schema)
 const initDb = async () => {
   try {
@@ -102,11 +110,19 @@ const calculateStreak = async (habitId) => {
   }
 };
 
+// Helper function to get local date in YYYY-MM-DD format
+function getLocalDate(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // 4. ROUTES
 // Home Page - View all habits (optimized with single query)
 app.get('/', async (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDate();
     const sortBy = req.query.sort || 'newest';
     
     // Fetch all data in one optimized query
@@ -229,7 +245,7 @@ app.post('/add', async (req, res) => {
 // Check-in for today
 app.post('/checkin/:id', async (req, res) => {
   const { id } = req.params;
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDate();
   
   try {
     // Insert or ignore if already checked in today
@@ -258,7 +274,7 @@ app.post('/delete/:id', async (req, res) => {
 // Undo today's check-in
 app.post('/undo/:id', async (req, res) => {
   const { id } = req.params;
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDate();
   
   try {
     await pool.query(
