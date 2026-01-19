@@ -11,6 +11,7 @@ app.set('view engine', 'ejs');
 
 // Middleware to parse form data (needed for Adding and Deleting)
 app.use(express.urlencoded({ extended: true }));
+app.use(express.json()); // For API endpoints
 
 // 2. DATABASE CONNECTION
 const pool = new Pool({
@@ -106,6 +107,7 @@ const calculateStreak = async (habitId) => {
 app.get('/', async (req, res) => {
   try {
     const today = new Date().toISOString().split('T')[0];
+    const sortBy = req.query.sort || 'newest';
     
     // Fetch all data in one optimized query
     const result = await pool.query(`
@@ -134,17 +136,21 @@ app.get('/', async (req, res) => {
           created_at: row.created_at,
           checkedInToday: false,
           streak: 0,
-          completions: []
+          completions: [],
+          totalCompletions: 0
         });
       }
       
       const habit = habitsMap.get(row.id);
       if (row.checked_today) habit.checkedInToday = true;
-      if (row.completed_date) habit.completions.push(row.completed_date);
+      if (row.completed_date) {
+        habit.completions.push(row.completed_date);
+        habit.totalCompletions++;
+      }
     }
     
     // Calculate streaks for each habit
-    const enrichedHabits = Array.from(habitsMap.values()).map(habit => {
+    let enrichedHabits = Array.from(habitsMap.values()).map(habit => {
       let streak = 0;
       const todayDate = new Date(today);
       todayDate.setHours(0, 0, 0, 0);
@@ -166,7 +172,33 @@ app.get('/', async (req, res) => {
       return { ...habit, streak };
     });
     
-    res.render('index', { habits: enrichedHabits });
+    // Apply sorting
+    switch (sortBy) {
+      case 'oldest':
+        enrichedHabits.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        break;
+      case 'streak':
+        enrichedHabits.sort((a, b) => b.streak - a.streak);
+        break;
+      case 'alphabetical':
+        enrichedHabits.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      default: // newest
+        enrichedHabits.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
+    
+    // Calculate stats
+    const stats = {
+      totalHabits: enrichedHabits.length,
+      completedToday: enrichedHabits.filter(h => h.checkedInToday).length,
+      totalCompletionsThisWeek: enrichedHabits.reduce((sum, h) => {
+        const weekAgo = new Date(today);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        return sum + h.completions.filter(d => new Date(d) >= weekAgo).length;
+      }, 0)
+    };
+    
+    res.render('index', { habits: enrichedHabits, stats, sortBy });
   } catch (err) {
     console.error('Error loading habits:', err);
     res.status(500).send("Database Error: " + err.message);
@@ -220,6 +252,100 @@ app.post('/delete/:id', async (req, res) => {
   } catch (err) {
     console.error('Error deleting habit:', err);
     res.status(500).send("Delete Error: " + err.message);
+  }
+});
+
+// Undo today's check-in
+app.post('/undo/:id', async (req, res) => {
+  const { id } = req.params;
+  const today = new Date().toISOString().split('T')[0];
+  
+  try {
+    await pool.query(
+      'DELETE FROM completions WHERE habit_id = $1 AND completed_date = $2',
+      [id, today]
+    );
+    res.redirect('/');
+  } catch (err) {
+    console.error('Error undoing check-in:', err);
+    res.status(500).send("Undo Error: " + err.message);
+  }
+});
+
+// Edit habit name
+app.post('/edit/:id', async (req, res) => {
+  const { id } = req.params;
+  const { habitName } = req.body;
+  
+  if (!habitName || habitName.trim().length === 0) {
+    return res.status(400).send('Habit name is required');
+  }
+  
+  if (habitName.length > 100) {
+    return res.status(400).send('Habit name too long (max 100 characters)');
+  }
+  
+  try {
+    await pool.query('UPDATE habits SET name = $1 WHERE id = $2', [habitName.trim(), id]);
+    res.redirect('/');
+  } catch (err) {
+    console.error('Error editing habit:', err);
+    res.status(500).send("Edit Error: " + err.message);
+  }
+});
+
+// Get completion history for a habit (API endpoint)
+app.get('/api/history/:id', async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const result = await pool.query(
+      `SELECT h.name, c.completed_date 
+       FROM habits h 
+       LEFT JOIN completions c ON h.id = c.habit_id 
+       WHERE h.id = $1 
+       ORDER BY c.completed_date DESC`,
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Habit not found' });
+    }
+    
+    res.json({
+      name: result.rows[0].name,
+      completions: result.rows
+        .filter(r => r.completed_date)
+        .map(r => r.completed_date)
+    });
+  } catch (err) {
+    console.error('Error fetching history:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Export to CSV
+app.get('/export', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT h.name, h.created_at, c.completed_date
+      FROM habits h
+      LEFT JOIN completions c ON h.id = c.habit_id
+      ORDER BY h.name, c.completed_date DESC
+    `);
+    
+    // Build CSV
+    let csv = 'Habit Name,Created At,Completed Date\n';
+    result.rows.forEach(row => {
+      csv += `"${row.name}","${row.created_at}","${row.completed_date || ''}"\n`;
+    });
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=habits-export.csv');
+    res.send(csv);
+  } catch (err) {
+    console.error('Error exporting data:', err);
+    res.status(500).send("Export Error: " + err.message);
   }
 });
 

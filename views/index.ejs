@@ -1,61 +1,175 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>K8s Habit Tracker</title>
+    <title>Habit Tracker</title>
     <style>
+        :root {
+            --bg-gradient-start: #667eea;
+            --bg-gradient-end: #764ba2;
+            --card-bg: #ffffff;
+            --text-primary: #2d3748;
+            --text-secondary: #718096;
+            --border-color: #e2e8f0;
+            --hover-border: #cbd5e0;
+            --input-focus: #667eea;
+        }
+
+        [data-theme="dark"] {
+            --bg-gradient-start: #1a202c;
+            --bg-gradient-end: #2d3748;
+            --card-bg: #2d3748;
+            --text-primary: #f7fafc;
+            --text-secondary: #cbd5e0;
+            --border-color: #4a5568;
+            --hover-border: #718096;
+            --input-focus: #667eea;
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
             min-height: 100vh;
             display: flex; 
             justify-content: center; 
-            align-items: center;
+            align-items: flex-start;
             padding: 20px; 
+            transition: background 0.3s;
         }
+        
+        .container { max-width: 600px; width: 100%; }
+        
         .card { 
-            background: white; 
+            background: var(--card-bg); 
             padding: 2.5rem; 
             border-radius: 20px; 
             box-shadow: 0 20px 60px rgba(0,0,0,0.3); 
-            width: 100%;
-            max-width: 500px;
+            margin-bottom: 20px;
             animation: slideIn 0.3s ease-out;
+            transition: background 0.3s;
         }
+        
         @keyframes slideIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        
         h2 { 
-            color: #2d3748; 
-            margin-bottom: 1.5rem; 
-            text-align: center;
+            color: var(--text-primary); 
             font-size: 2rem;
             font-weight: 700;
         }
-        .form-container {
-            margin-bottom: 2rem;
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
         }
+        
+        .theme-toggle, .export-btn {
+            background: transparent;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.2s;
+            text-decoration: none;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+        }
+        
+        .theme-toggle:hover, .export-btn:hover {
+            border-color: var(--input-focus);
+            transform: scale(1.05);
+        }
+        
+        .stats {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .stat-card {
+            flex: 1;
+            background: linear-gradient(135deg, #667eea20 0%, #764ba220 100%);
+            padding: 12px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        
+        .sort-controls {
+            margin-bottom: 1rem;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .sort-btn {
+            padding: 6px 12px;
+            border: 2px solid var(--border-color);
+            background: transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+        
+        .sort-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+        }
+        
+        .form-container { margin-bottom: 2rem; }
+        
         input { 
             width: 100%; 
             padding: 14px 16px; 
             margin-bottom: 12px; 
-            border: 2px solid #e2e8f0;
+            border: 2px solid var(--border-color);
             border-radius: 10px;
             font-size: 1rem;
             transition: all 0.2s;
+            background: var(--card-bg);
+            color: var(--text-primary);
         }
+        
         input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: var(--input-focus);
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
+        
         .btn-add { 
             width: 100%; 
             padding: 14px; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            backgrocd und: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white; 
             border: none; 
             border-radius: 10px;
@@ -65,15 +179,17 @@
             transition: all 0.2s;
             box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
         }
+        
         .btn-add:hover { 
             transform: translateY(-2px);
             box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
         }
-        .btn-add:active { transform: translateY(0); }
-        ul { list-style: none; padding: 0; margin-top: 20px; }
+        
+        ul { list-style: none; padding: 0; }
+        
         li { 
-            background: #f7fafc;
-            border: 1px solid #e2e8f0;
+            background: linear-gradient(135deg, #f7fafccc 0%, #f7fafcaa 100%);
+            border: 1px solid var(--border-color);
             border-radius: 12px;
             padding: 16px; 
             margin-bottom: 12px;
@@ -81,23 +197,33 @@
             justify-content: space-between; 
             align-items: center;
             transition: all 0.2s;
+            cursor: pointer;
         }
+        
+        [data-theme="dark"] li {
+            background: linear-gradient(135deg, #4a5568cc 0%, #4a5568aa 100%);
+        }
+        
         li:hover {
-            border-color: #cbd5e0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            border-color: var(--hover-border);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
         }
+        
         .habit-info strong { 
             display: block; 
-            color: #2d3748; 
+            color: var(--text-primary); 
             font-size: 1.1rem;
             margin-bottom: 6px;
         }
+        
         .habit-info small { 
-            color: #718096; 
+            color: var(--text-secondary); 
             font-size: 0.8rem;
             display: block;
             margin-bottom: 8px;
         }
+        
         .streak { 
             display: inline-block;
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
@@ -108,7 +234,8 @@
             font-weight: 600;
             box-shadow: 0 2px 8px rgba(245, 87, 108, 0.3);
         }
-        .btn-checkin { 
+        
+        .btn-checkin, .btn-undo { 
             background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
             color: white; 
             border: none; 
@@ -121,90 +248,300 @@
             transition: all 0.2s;
             box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
         }
-        .btn-checkin:hover { 
+        
+        .btn-undo {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            box-shadow: 0 2px 8px rgba(251, 191, 36, 0.3);
+        }
+        
+        .btn-checkin:hover, .btn-undo:hover { 
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
         }
-        .btn-checkin:disabled { 
-            background: #cbd5e0;
-            cursor: not-allowed;
-            opacity: 0.7;
-            box-shadow: none;
-        }
-        .btn-delete { 
-            background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
-            color: white; 
+        
+        .btn-edit, .btn-delete { 
+            background: transparent;
+            color: var(--text-secondary); 
             border: none; 
-            padding: 8px 12px; 
+            padding: 8px 10px; 
             border-radius: 8px; 
             cursor: pointer;
-            font-size: 0.85rem;
-            font-weight: 600;
+            font-size: 1rem;
             transition: all 0.2s;
-            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
         }
-        .btn-delete:hover { 
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
-        }
+        
+        .btn-edit:hover { color: #3b82f6; }
+        .btn-delete:hover { color: #ef4444; }
+        
         .habit-actions { display: flex; gap: 6px; align-items: center; }
+        
         .empty-state {
             text-align: center;
             padding: 3rem 1rem;
-            color: #718096;
+            color: var(--text-secondary);
         }
-        .empty-state svg {
-            width: 64px;
-            height: 64px;
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .modal.active { display: flex; }
+        
+        .modal-content {
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 16px;
+            max-width: 400px;
+            width: 90%;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 1rem;
-            opacity: 0.5;
+        }
+        
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .close-modal {
+            background: transparent;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+        
+        .history-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .history-item {
+            padding: 8px 12px;
+            background: var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+        
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            background: #f093fb;
+            animation: confettiFall 1s ease-out forwards;
+            pointer-events: none;
+        }
+        
+        @keyframes confettiFall {
+            to {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h2>🎯 Habit Tracker</h2>
-        
-        <div class="form-container">
-            <form action="/add" method="POST">
-                <input type="text" name="habitName" placeholder="Enter a new habit..." maxlength="100" required>
-                <button type="submit" class="btn-add">+ Add Habit</button>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <h2>🎯 Habit Tracker</h2>
+                <div class="controls">
+                    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">🌓</button>
+                    <a href="/export" class="export-btn" title="Export to CSV">📥</a>
+                </div>
+            </div>
+            
+            <% if (habits.length > 0) { %>
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value"><%= stats.completedToday %> / <%= stats.totalHabits %></div>
+                    <div class="stat-label">Completed Today</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value"><%= stats.totalCompletionsThisWeek %></div>
+                    <div class="stat-label">This Week</div>
+                </div>
+            </div>
+            
+            <div class="sort-controls">
+                <a href="/?sort=newest" class="sort-btn <%= sortBy === 'newest' ? 'active' : '' %>">🆕 Newest</a>
+                <a href="/?sort=oldest" class="sort-btn <%= sortBy === 'oldest' ? 'active' : '' %>">📅 Oldest</a>
+                <a href="/?sort=streak" class="sort-btn <%= sortBy === 'streak' ? 'active' : '' %>">🔥 Streak</a>
+                <a href="/?sort=alphabetical" class="sort-btn <%= sortBy === 'alphabetical' ? 'active' : '' %>">🔤 A-Z</a>
+            </div>
+            <% } %>
+            
+            <div class="form-container">
+                <form action="/add" method="POST">
+                    <input type="text" name="habitName" placeholder="Enter a new habit..." maxlength="100" required>
+                    <button type="submit" class="btn-add">+ Add Habit</button>
+                </form>
+            </div>
+
+            <ul>
+                <% if (habits.length === 0) { %>
+                    <div class="empty-state">
+                        <div style="font-size: 4rem; margin-bottom: 1rem;">🎯</div>
+                        <p>No habits yet. Start building better habits today!</p>
+                    </div>
+                <% } %>
+
+                <% habits.forEach(habit => { %>
+                    <li onclick="showHistory(<%= habit.id %>)">
+                        <div class="habit-info">
+                            <strong><%= habit.name %></strong>
+                            <small>📅 Started <%= new Date(habit.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) %> • <%= habit.totalCompletions %> completions</small>
+                            <% if (habit.streak > 0) { %>
+                                <span class="streak">🔥 <%= habit.streak %> day<%= habit.streak > 1 ? 's' : '' %> streak</span>
+                            <% } %>
+                        </div>
+                        
+                        <div class="habit-actions" onclick="event.stopPropagation()">
+                            <% if (habit.checkedInToday) { %>
+                                <form action="/undo/<%= habit.id %>" method="POST" style="margin: 0;">
+                                    <button type="submit" class="btn-undo">↩️ Undo</button>
+                                </form>
+                            <% } else { %>
+                                <form action="/checkin/<%= habit.id %>" method="POST" style="margin: 0;" onsubmit="celebrate(event)">
+                                    <button type="submit" class="btn-checkin">✓ Check In</button>
+                                </form>
+                            <% } %>
+                            <button class="btn-edit" onclick="editHabit(<%= habit.id %>, '<%= habit.name.replace(/'/g, "\\'") %>')" title="Edit">✏️</button>
+                            <form action="/delete/<%= habit.id %>" method="POST" style="margin: 0;">
+                                <button type="submit" class="btn-delete" onclick="return confirm('Delete this habit and all its progress?')" title="Delete">🗑️</button>
+                            </form>
+                        </div>
+                    </li>
+                <% }) %>
+            </ul>
+        </div>
+    </div>
+
+    <!-- History Modal -->
+    <div id="historyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">History</h3>
+                <button class="close-modal" onclick="closeModal()">×</button>
+            </div>
+            <ul class="history-list" id="historyList"></ul>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Edit Habit</h3>
+                <button class="close-modal" onclick="closeEditModal()">×</button>
+            </div>
+            <form id="editForm" method="POST">
+                <input type="text" id="editInput" name="habitName" maxlength="100" required>
+                <button type="submit" class="btn-add">Save Changes</button>
             </form>
         </div>
-
-        <ul>
-            <% if (habits.length === 0) { %>
-                <div class="empty-state">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p>No habits yet. Start building better habits today!</p>
-                </div>
-            <% } %>
-
-            <% habits.forEach(habit => { %>
-                <li>
-                    <div class="habit-info">
-                        <strong><%= habit.name %></strong>
-                        <small>📅 Started <%= new Date(habit.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) %></small>
-                        <% if (habit.streak > 0) { %>
-                            <span class="streak">🔥 <%= habit.streak %> day<%= habit.streak > 1 ? 's' : '' %> streak</span>
-                        <% } %>
-                    </div>
-                    
-                    <div class="habit-actions">
-                        <form action="/checkin/<%= habit.id %>" method="POST" style="margin: 0;">
-                            <button type="submit" class="btn-checkin" <%= habit.checkedInToday ? 'disabled' : '' %>>
-                                <%= habit.checkedInToday ? '✓ Done' : '✓ Check In' %>
-                            </button>
-                        </form>
-                        <form action="/delete/<%= habit.id %>" method="POST" style="margin: 0;">
-                            <button type="submit" class="btn-delete" onclick="return confirm('Delete this habit and all its progress?')">🗑️</button>
-                        </form>
-                    </div>
-                </li>
-            <% }) %>
-        </ul>
     </div>
+
+    <script>
+        // Dark mode
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        }
+
+        // Load saved theme
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+
+        // Show history
+        async function showHistory(habitId) {
+            const modal = document.getElementById('historyModal');
+            const list = document.getElementById('historyList');
+            const title = document.getElementById('modalTitle');
+            
+            try {
+                const response = await fetch(`/api/history/${habitId}`);
+                const data = await response.json();
+                
+                title.textContent = `${data.name} - History`;
+                
+                if (data.completions.length === 0) {
+                    list.innerHTML = '<li class="history-item">No completions yet</li>';
+                } else {
+                    list.innerHTML = data.completions.map(date => 
+                        `<li class="history-item">✅ ${new Date(date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</li>`
+                    ).join('');
+                }
+                
+                modal.classList.add('active');
+            } catch (err) {
+                alert('Error loading history');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('historyModal').classList.remove('active');
+        }
+
+        // Edit habit
+        function editHabit(id, name) {
+            const modal = document.getElementById('editModal');
+            const form = document.getElementById('editForm');
+            const input = document.getElementById('editInput');
+            
+            form.action = `/edit/${id}`;
+            input.value = name;
+            modal.classList.add('active');
+            input.focus();
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.remove('active');
+        }
+
+        // Confetti celebration
+        function celebrate(event) {
+            for (let i = 0; i < 30; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.style.left = Math.random() * 100 + '%';
+                    confetti.style.background = ['#f093fb', '#f5576c', '#4ade80', '#fbbf24', '#667eea'][Math.floor(Math.random() * 5)];
+                    confetti.style.animationDelay = Math.random() * 0.5 + 's';
+                    document.body.appendChild(confetti);
+                    setTimeout(() => confetti.remove(), 1000);
+                }, i * 30);
+            }
+        }
+
+        // Close modals on outside click
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+    </script>
 </body>
 </html>
