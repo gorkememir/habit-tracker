@@ -478,6 +478,29 @@
             height: 10px;
             border-radius: 2px;
         }
+        
+        .reminder-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        
+        .reminder-toggle input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+        
+        #reminderTimeInput {
+            display: none;
+        }
+        
+        #reminderTimeInput.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -513,9 +536,13 @@
             <% } %>
             
             <div class="form-container">
-                <form action="/add" method="POST">
-                    <input type="text" name="habitName" placeholder="Enter a new habit..." maxlength="100" required>
-                    <input type="time" name="reminderTime" placeholder="Reminder time (optional)" style="margin-bottom: 12px;">
+                <form action="/add" method="POST" id="addHabitForm">
+                    <input type="text" name="habitName" id="habitNameInput" placeholder="Enter a new habit..." maxlength="100" required>
+                    <label class="reminder-toggle">
+                        <input type="checkbox" id="reminderToggle" onchange="toggleReminderInput()">
+                        <span>Set a reminder time?</span>
+                    </label>
+                    <input type="time" name="reminderTime" id="reminderTimeInput" placeholder="Reminder time">
                     <button type="submit" class="btn-add">+ Add Habit</button>
                 </form>
             </div>
@@ -567,18 +594,12 @@
                         
                         <div class="habit-actions" onclick="event.stopPropagation()">
                             <% if (habit.checkedInToday) { %>
-                                <form action="/undo/<%= habit.id %>" method="POST" style="margin: 0;">
-                                    <button type="submit" class="btn-undo">↩️ Undo</button>
-                                </form>
+                                <button type="button" class="btn-undo" onclick="undoCheckIn(<%= habit.id %>)">↩️ Undo</button>
                             <% } else { %>
-                                <form action="/checkin/<%= habit.id %>" method="POST" style="margin: 0;" onsubmit="celebrate(event)">
-                                    <button type="submit" class="btn-checkin">✓ Check In</button>
-                                </form>
+                                <button type="button" class="btn-checkin" onclick="checkIn(<%= habit.id %>, event)">✓ Check In</button>
                             <% } %>
                             <button class="btn-edit" onclick="editHabit(<%= habit.id %>, '<%= habit.name.replace(/'/g, "\\'") %>', '<%= habit.reminderTime || '' %>')" title="Edit">✏️</button>
-                            <form action="/delete/<%= habit.id %>" method="POST" style="margin: 0;">
-                                <button type="submit" class="btn-delete" onclick="return confirm('Delete this habit and all its progress?')" title="Delete">🗑️</button>
-                            </form>
+                            <button type="button" class="btn-delete" onclick="deleteHabit(<%= habit.id %>)" title="Delete">🗑️</button>
                         </div>
                     </li>
                 <% }) %>
@@ -610,7 +631,11 @@
             </div>
             <form id="editForm" method="POST">
                 <input type="text" id="editInput" name="habitName" maxlength="100" required>
-                <input type="time" id="editReminderTime" name="reminderTime" style="margin-bottom: 12px;">
+                <label class="reminder-toggle">
+                    <input type="checkbox" id="editReminderToggle" onchange="toggleEditReminderInput()">
+                    <span>Set a reminder time?</span>
+                </label>
+                <input type="time" id="editReminderTime" name="reminderTime">
                 <button type="submit" class="btn-add">Save Changes</button>
             </form>
         </div>
@@ -629,6 +654,61 @@
         // Load saved theme
         const savedTheme = localStorage.getItem('theme') || 'light';
         document.documentElement.setAttribute('data-theme', savedTheme);
+        
+        // Toggle reminder input visibility
+        function toggleReminderInput() {
+            const toggle = document.getElementById('reminderToggle');
+            const input = document.getElementById('reminderTimeInput');
+            input.classList.toggle('active', toggle.checked);
+            if (!toggle.checked) input.value = '';
+        }
+        
+        function toggleEditReminderInput() {
+            const toggle = document.getElementById('editReminderToggle');
+            const input = document.getElementById('editReminderTime');
+            input.classList.toggle('active', toggle.checked);
+            if (!toggle.checked) input.value = '';
+        }
+        
+        // AJAX form submissions
+        async function checkIn(habitId, event) {
+            try {
+                celebrate(event);
+                const response = await fetch(`/checkin/${habitId}`, { method: 'POST' });
+                if (response.ok) {
+                    location.reload();
+                }
+            } catch (err) {
+                console.error('Error checking in:', err);
+                alert('Failed to check in');
+            }
+        }
+        
+        async function undoCheckIn(habitId) {
+            try {
+                const response = await fetch(`/undo/${habitId}`, { method: 'POST' });
+                if (response.ok) {
+                    location.reload();
+                }
+            } catch (err) {
+                console.error('Error undoing check-in:', err);
+                alert('Failed to undo check-in');
+            }
+        }
+        
+        async function deleteHabit(habitId) {
+            if (!confirm('Delete this habit and all its progress?')) return;
+            
+            try {
+                const response = await fetch(`/delete/${habitId}`, { method: 'POST' });
+                if (response.ok) {
+                    location.reload();
+                }
+            } catch (err) {
+                console.error('Error deleting habit:', err);
+                alert('Failed to delete habit');
+            }
+        }
         
         // Load version info
         fetch('/api/version')
@@ -721,10 +801,13 @@
             const form = document.getElementById('editForm');
             const input = document.getElementById('editInput');
             const timeInput = document.getElementById('editReminderTime');
+            const toggle = document.getElementById('editReminderToggle');
             
             form.action = `/edit/${id}`;
             input.value = name;
             timeInput.value = reminderTime || '';
+            toggle.checked = !!reminderTime;
+            timeInput.classList.toggle('active', !!reminderTime);
             modal.classList.add('active');
             input.focus();
         }
@@ -735,6 +818,7 @@
 
         // Confetti celebration
         function celebrate(event) {
+            if (event) event.preventDefault();
             for (let i = 0; i < 30; i++) {
                 setTimeout(() => {
                     const confetti = document.createElement('div');
