@@ -52,8 +52,15 @@ const initDb = async () => {
       CREATE TABLE IF NOT EXISTS habits (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        reminder_time TIME
       )
+    `);
+    
+    // Add reminder_time column if it doesn't exist (migration)
+    await pool.query(`
+      ALTER TABLE habits 
+      ADD COLUMN IF NOT EXISTS reminder_time TIME
     `);
 
     // Create completions table to track daily check-ins
@@ -132,6 +139,7 @@ app.get('/', async (req, res) => {
           h.id,
           h.name,
           h.created_at,
+          h.reminder_time,
           c.completed_date,
           CASE WHEN c.completed_date = $1 THEN true ELSE false END as checked_today
         FROM habits h
@@ -150,6 +158,7 @@ app.get('/', async (req, res) => {
           id: row.id,
           name: row.name,
           created_at: row.created_at,
+          reminderTime: row.reminder_time,
           checkedInToday: false,
           streak: 0,
           completions: [],
@@ -223,7 +232,7 @@ app.get('/', async (req, res) => {
 
 // Add a Habit
 app.post('/add', async (req, res) => {
-  const { habitName } = req.body;
+  const { habitName, reminderTime } = req.body;
   
   if (!habitName || habitName.trim().length === 0) {
     return res.status(400).send('Habit name is required');
@@ -234,7 +243,10 @@ app.post('/add', async (req, res) => {
   }
   
   try {
-    await pool.query('INSERT INTO habits (name) VALUES ($1)', [habitName.trim()]);
+    await pool.query(
+      'INSERT INTO habits (name, reminder_time) VALUES ($1, $2)',
+      [habitName.trim(), reminderTime || null]
+    );
     res.redirect('/');
   } catch (err) {
     console.error('Error adding habit:', err);
@@ -291,7 +303,7 @@ app.post('/undo/:id', async (req, res) => {
 // Edit habit name
 app.post('/edit/:id', async (req, res) => {
   const { id } = req.params;
-  const { habitName } = req.body;
+  const { habitName, reminderTime } = req.body;
   
   if (!habitName || habitName.trim().length === 0) {
     return res.status(400).send('Habit name is required');
@@ -302,7 +314,10 @@ app.post('/edit/:id', async (req, res) => {
   }
   
   try {
-    await pool.query('UPDATE habits SET name = $1 WHERE id = $2', [habitName.trim(), id]);
+    await pool.query(
+      'UPDATE habits SET name = $1, reminder_time = $2 WHERE id = $3',
+      [habitName.trim(), reminderTime || null, id]
+    );
     res.redirect('/');
   } catch (err) {
     console.error('Error editing habit:', err);
@@ -427,6 +442,31 @@ app.get('/api/version', (req, res) => {
   const commitMessage = process.env.COMMIT_MESSAGE || 'Unknown';
   const commitSha = process.env.COMMIT_SHA || 'Unknown';
   res.json({ commit: commitSha.substring(0, 7), message: commitMessage });
+});
+
+// Check for pending reminders
+app.get('/api/reminders', async (req, res) => {
+  try {
+    const now = new Date();
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const today = getLocalDate();
+    
+    // Get habits with reminders due and not yet completed today
+    const result = await pool.query(
+      `SELECT h.id, h.name, h.reminder_time 
+       FROM habits h
+       LEFT JOIN completions c ON h.id = c.habit_id AND c.completed_date = $1
+       WHERE h.reminder_time IS NOT NULL 
+       AND h.reminder_time <= $2::time
+       AND c.id IS NULL`,
+      [today, currentTime]
+    );
+    
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching reminders:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // 5. START SERVER

@@ -515,6 +515,7 @@
             <div class="form-container">
                 <form action="/add" method="POST">
                     <input type="text" name="habitName" placeholder="Enter a new habit..." maxlength="100" required>
+                    <input type="time" name="reminderTime" placeholder="Reminder time (optional)" style="margin-bottom: 12px;">
                     <button type="submit" class="btn-add">+ Add Habit</button>
                 </form>
             </div>
@@ -554,7 +555,11 @@
                     <li onclick="showHistory(<%= habit.id %>)">
                         <div class="habit-info">
                             <strong><%= habit.name %></strong>
-                            <small>📅 Started <%= new Date(habit.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) %> • <%= habit.totalCompletions %> completions</small>
+                            <small>📅 Started <%= new Date(habit.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) %> • <%= habit.totalCompletions %> completions
+                            <% if (habit.reminderTime) { %>
+                                • ⏰ <%= habit.reminderTime.substring(0, 5) %>
+                            <% } %>
+                            </small>
                             <% if (habit.streak > 0) { %>
                                 <span class="streak">🔥 <%= habit.streak %> day<%= habit.streak > 1 ? 's' : '' %> streak</span>
                             <% } %>
@@ -570,7 +575,7 @@
                                     <button type="submit" class="btn-checkin">✓ Check In</button>
                                 </form>
                             <% } %>
-                            <button class="btn-edit" onclick="editHabit(<%= habit.id %>, '<%= habit.name.replace(/'/g, "\\'") %>')" title="Edit">✏️</button>
+                            <button class="btn-edit" onclick="editHabit(<%= habit.id %>, '<%= habit.name.replace(/'/g, "\\'") %>', '<%= habit.reminderTime || '' %>')" title="Edit">✏️</button>
                             <form action="/delete/<%= habit.id %>" method="POST" style="margin: 0;">
                                 <button type="submit" class="btn-delete" onclick="return confirm('Delete this habit and all its progress?')" title="Delete">🗑️</button>
                             </form>
@@ -605,6 +610,7 @@
             </div>
             <form id="editForm" method="POST">
                 <input type="text" id="editInput" name="habitName" maxlength="100" required>
+                <input type="time" id="editReminderTime" name="reminderTime" style="margin-bottom: 12px;">
                 <button type="submit" class="btn-add">Save Changes</button>
             </form>
         </div>
@@ -633,6 +639,51 @@
             .catch(() => {
                 document.getElementById('versionInfo').textContent = '';
             });
+        
+        // Notification system
+        let notificationPermission = false;
+        const shownReminders = new Set();
+        
+        // Request notification permission
+        if ('Notification' in window) {
+            Notification.requestPermission().then(permission => {
+                notificationPermission = permission === 'granted';
+            });
+        }
+        
+        // Check for reminders every minute
+        function checkReminders() {
+            fetch('/api/reminders')
+                .then(r => r.json())
+                .then(habits => {
+                    habits.forEach(habit => {
+                        const key = `${habit.id}-${new Date().toDateString()}`;
+                        if (!shownReminders.has(key)) {
+                            shownReminders.add(key);
+                            showReminder(habit);
+                        }
+                    });
+                })
+                .catch(err => console.error('Error checking reminders:', err));
+        }
+        
+        function showReminder(habit) {
+            if (notificationPermission) {
+                new Notification('🎯 Habit Reminder', {
+                    body: `Time to complete: ${habit.name}`,
+                    icon: '/favicon.ico',
+                    badge: '/favicon.ico',
+                    tag: `habit-${habit.id}`
+                });
+            } else {
+                // Fallback to alert if notifications not supported
+                console.log(`Reminder: ${habit.name}`);
+            }
+        }
+        
+        // Check reminders every minute
+        checkReminders();
+        setInterval(checkReminders, 60000);
 
         // Show history
         async function showHistory(habitId) {
@@ -665,13 +716,15 @@
         }
 
         // Edit habit
-        function editHabit(id, name) {
+        function editHabit(id, name, reminderTime) {
             const modal = document.getElementById('editModal');
             const form = document.getElementById('editForm');
             const input = document.getElementById('editInput');
+            const timeInput = document.getElementById('editReminderTime');
             
             form.action = `/edit/${id}`;
             input.value = name;
+            timeInput.value = reminderTime || '';
             modal.classList.add('active');
             input.focus();
         }
