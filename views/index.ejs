@@ -51,9 +51,35 @@
             align-items: center; 
         }
         li:last-child { border-bottom: none; }
-        .habit-info strong { display: block; color: #333; }
+        .habit-info strong { display: block; color: #333; margin-bottom: 4px; }
         .habit-info small { color: #777; font-size: 0.75rem; }
-        .btn-done { 
+        .streak { 
+            display: inline-block;
+            background: #ffc107; 
+            color: #000; 
+            padding: 2px 8px; 
+            border-radius: 12px; 
+            font-size: 0.7rem; 
+            font-weight: bold;
+            margin-top: 4px;
+        }
+        .btn-checkin { 
+            background: #28a745; 
+            color: white; 
+            border: none; 
+            padding: 6px 12px; 
+            border-radius: 4px; 
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-right: 4px;
+        }
+        .btn-checkin:hover { background: #218838; }
+        .btn-checkin:disabled { 
+            background: #6c757d; 
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        .btn-delete { 
             background: #dc3545; 
             color: white; 
             border: none; 
@@ -62,7 +88,8 @@
             cursor: pointer;
             font-size: 0.8rem;
         }
-        .btn-done:hover { background: #c82333; }
+        .btn-delete:hover { background: #c82333; }
+        .habit-actions { display: flex; gap: 4px; }
     </style>
 </head>
 <body>
@@ -83,12 +110,22 @@
                 <li>
                     <div class="habit-info">
                         <strong><%= habit.name %></strong>
-                        <small><%= new Date(habit.created_at).toLocaleString() %></small>
+                        <small>Created <%= new Date(habit.created_at).toLocaleDateString() %></small>
+                        <% if (habit.streak > 0) { %>
+                            <span class="streak">🔥 <%= habit.streak %> day<%= habit.streak > 1 ? 's' : '' %></span>
+                        <% } %>
                     </div>
                     
-                    <form action="/delete/<%= habit.id %>" method="POST" style="margin: 0;">
-                        <button type="submit" class="btn-done">Done</button>
-                    </form>
+                    <div class="habit-actions">
+                        <form action="/checkin/<%= habit.id %>" method="POST" style="margin: 0;">
+                            <button type="submit" class="btn-checkin" <%= habit.checkedInToday ? 'disabled' : '' %>>
+                                <%= habit.checkedInToday ? '✓ Done' : 'Check In' %>
+                            </button>
+                        </form>
+                        <form action="/delete/<%= habit.id %>" method="POST" style="margin: 0;">
+                            <button type="submit" class="btn-delete" onclick="return confirm('Delete this habit?')">🗑</button>
+                        </form>
+                    </div>
                 </li>
             <% }) %>
         </ul>

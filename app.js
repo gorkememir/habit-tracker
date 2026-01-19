@@ -24,28 +24,24 @@ const pool = new Pool({
 // 3. DATABASE INITIALIZATION (Self-Healing Schema)
 const initDb = async () => {
   try {
-    // Create table if it doesn't exist
+    // Create habits table if it doesn't exist
     await pool.query(`
       CREATE TABLE IF NOT EXISTS habits (
         id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL
+        name TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // Check if the 'created_at' column exists (for older versions of the DB)
-    const columnCheck = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name='habits' AND column_name='created_at'
+    // Create completions table to track daily check-ins
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS completions (
+        id SERIAL PRIMARY KEY,
+        habit_id INTEGER REFERENCES habits(id) ON DELETE CASCADE,
+        completed_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        UNIQUE(habit_id, completed_date)
+      )
     `);
-
-    // If 'created_at' is missing, add it automatically
-    if (columnCheck.rowCount === 0) {
-      console.log("Migration: Adding missing 'created_at' column...");
-      await pool.query(`
-        ALTER TABLE habits ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      `);
-    }
 
     console.log("✅ Database is ready and schema is up to date.");
   } catch (err) {
@@ -54,12 +50,68 @@ const initDb = async () => {
 };
 initDb();
 
+// Helper function to calculate streak
+const calculateStreak = async (habitId) => {
+  try {
+    const result = await pool.query(
+      `SELECT completed_date FROM completions 
+       WHERE habit_id = $1 
+       ORDER BY completed_date DESC`,
+      [habitId]
+    );
+    
+    if (result.rows.length === 0) return 0;
+    
+    let streak = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    for (let i = 0; i < result.rows.length; i++) {
+      const completedDate = new Date(result.rows[i].completed_date);
+      completedDate.setHours(0, 0, 0, 0);
+      
+      const expectedDate = new Date(today);
+      expectedDate.setDate(today.getDate() - i);
+      
+      if (completedDate.getTime() === expectedDate.getTime()) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    
+    return streak;
+  } catch (err) {
+    console.error('Error calculating streak:', err);
+    return 0;
+  }
+};
+
 // 4. ROUTES
 // Home Page - View all habits
 app.get('/', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM habits ORDER BY created_at DESC');
-    res.render('index', { habits: result.rows });
+    const habitsResult = await pool.query('SELECT * FROM habits ORDER BY created_at DESC');
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Enrich each habit with streak and today's completion status
+    const enrichedHabits = await Promise.all(
+      habitsResult.rows.map(async (habit) => {
+        const streak = await calculateStreak(habit.id);
+        const todayCheck = await pool.query(
+          'SELECT id FROM completions WHERE habit_id = $1 AND completed_date = $2',
+          [habit.id, today]
+        );
+        
+        return {
+          ...habit,
+          streak,
+          checkedInToday: todayCheck.rows.length > 0
+        };
+      })
+    );
+    
+    res.render('index', { habits: enrichedHabits });
   } catch (err) {
     console.error(err);
     res.status(500).send("Database Error: " + err.message);
@@ -77,7 +129,24 @@ app.post('/add', async (req, res) => {
   }
 });
 
-// Delete a Habit (The "Done" Button)
+// Check-in for today
+app.post('/checkin/:id', async (req, res) => {
+  const { id } = req.params;
+  const today = new Date().toISOString().split('T')[0];
+  
+  try {
+    // Insert or ignore if already checked in today
+    await pool.query(
+      'INSERT INTO completions (habit_id, completed_date) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [id, today]
+    );
+    res.redirect('/');
+  } catch (err) {
+    res.status(500).send("Check-in Error: " + err.message);
+  }
+});
+
+// Delete a Habit
 app.post('/delete/:id', async (req, res) => {
   const { id } = req.params;
   try {
