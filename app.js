@@ -361,7 +361,7 @@ app.get('/api/calendar', async (req, res) => {
     const endDate = `${yearNum}-${String(monthNum).padStart(2, '0')}-${new Date(yearNum, monthNum, 0).getDate()}`;
     
     const result = await pool.query(
-      `SELECT c.completed_date, h.name 
+      `SELECT c.completed_date::text as completed_date, h.name 
        FROM completions c 
        JOIN habits h ON c.habit_id = h.id 
        WHERE c.completed_date >= $1 AND c.completed_date <= $2 
@@ -420,6 +420,13 @@ app.get('/health', async (req, res) => {
     console.error('Health check failed:', err);
     res.status(503).json({ status: 'unhealthy', database: 'disconnected' });
   }
+});
+
+// Get latest commit message
+app.get('/api/version', (req, res) => {
+  const commitMessage = process.env.COMMIT_MESSAGE || 'Unknown';
+  const commitSha = process.env.COMMIT_SHA || 'Unknown';
+  res.json({ commit: commitSha.substring(0, 7), message: commitMessage });
 });
 
 // 5. START SERVER
