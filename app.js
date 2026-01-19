@@ -14,10 +14,10 @@ app.use(express.urlencoded({ extended: true }));
 
 // 2. DATABASE CONNECTION
 const pool = new Pool({
-  user: 'postgres',
-  host: 'postgres-service', // Matches your K8s Service name
-  database: 'habitdb',
-  password: 'mysecretpassword',
+  user: process.env.POSTGRES_USER || 'postgres',
+  host: process.env.POSTGRES_HOST || 'postgres-service',
+  database: process.env.POSTGRES_DB || 'habitdb',
+  password: process.env.POSTGRES_PASSWORD || 'mysecretpassword',
   port: 5432,
 });
 
