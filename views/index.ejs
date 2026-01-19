@@ -417,11 +417,13 @@
             min-height: 60px;
             background: var(--card-bg);
             transition: all 0.2s;
+            cursor: pointer;
         }
         
-        .calendar-day:hover {
+        .calendar-day:hover:not(.other-month) {
             border-color: var(--input-focus);
-            transform: scale(1.02);
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
         }
         
         .calendar-day.other-month {
@@ -445,13 +447,13 @@
             flex-wrap: wrap;
             gap: 2px;
             justify-content: center;
+            margin-top: 2px;
         }
         
         .calendar-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+            width: 8px;
+            height: 8px;
+            border-radius: 2px;
         }
         
         .habit-legend {
@@ -472,10 +474,9 @@
         }
         
         .legend-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
         }
     </style>
 </head>
@@ -750,14 +751,16 @@
                 
                 if (calendarData[dateStr] && calendarData[dateStr].length > 0) {
                     html += '<div class="calendar-dots">';
-                    calendarData[dateStr].forEach(() => {
-                        html += '<div class="calendar-dot"></div>';
+                    calendarData[dateStr].forEach(habit => {
+                        const color = getHabitColor(habit);
+                        html += `<div class="calendar-dot" style="background: ${color}"></div>`;
                     });
                     html += '</div>';
                 }
                 
                 dayEl.innerHTML = html;
-                dayEl.title = calendarData[dateStr] ? calendarData[dateStr].join(', ') : 'No completions';
+                dayEl.title = calendarData[dateStr] ? calendarData[dateStr].join(', ') : 'Click to view';
+                dayEl.onclick = () => showDayDetails(dateStr);
                 daysContainer.appendChild(dayEl);
             }
             
@@ -788,9 +791,55 @@
                 return;
             }
             
-            legend.innerHTML = Array.from(allHabits).map(habit => 
-                `<div class="legend-item"><div class="legend-dot"></div>${habit}</div>`
-            ).join('');
+            legend.innerHTML = Array.from(allHabits).map(habit => {
+                const color = getHabitColor(habit);
+                return `<div class="legend-item"><div class="legend-dot" style="background: ${color}"></div>${habit}</div>`;
+            }).join('');
+        }
+        
+        // Generate consistent colors for habits
+        const habitColors = {};
+        const colorPalette = [
+            'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+            'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+            'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+            'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+            'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
+            'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+            'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
+            'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+            'linear-gradient(135deg, #ff6e7f 0%, #bfe9ff 100%)'
+        ];
+        let colorIndex = 0;
+        
+        function getHabitColor(habitName) {
+            if (!habitColors[habitName]) {
+                habitColors[habitName] = colorPalette[colorIndex % colorPalette.length];
+                colorIndex++;
+            }
+            return habitColors[habitName];
+        }
+        
+        function showDayDetails(dateStr) {
+            const habits = calendarData[dateStr] || [];
+            const modal = document.getElementById('historyModal');
+            const title = document.getElementById('modalTitle');
+            const list = document.getElementById('historyList');
+            
+            const date = new Date(dateStr + 'T00:00:00');
+            title.textContent = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+            
+            if (habits.length === 0) {
+                list.innerHTML = '<li class="history-item">No completions on this day</li>';
+            } else {
+                list.innerHTML = habits.map(habit => {
+                    const color = getHabitColor(habit);
+                    return `<li class="history-item"><div class="legend-dot" style="background: ${color}; display: inline-block; margin-right: 8px; vertical-align: middle;"></div>${habit}</li>`;
+                }).join('');
+            }
+            
+            modal.classList.add('active');
         }
         
         function toggleCalendar() {
