@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: habit-app
-        image: gorkememir/habit-tracker:db0848e8e08a3237165a44ca07c205f18d4dfc9f
+        image: gorkememir/habit-tracker:7dda4fd8558d658ef349edb719e505abe86a137e
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
