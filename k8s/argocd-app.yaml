@@ -18,3 +18,13 @@ spec:
       selfHeal: true   # Auto-sync when cluster state differs
     syncOptions:
       - CreateNamespace=true  # Auto-create namespace if needed
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  # Sync every 30 seconds instead of default 3 minutes
+  info:
+    - name: syncInterval
+      value: "30"
