@@ -425,7 +425,6 @@ app.post('/checkin/:id', async (req, res) => {
        WHERE id = $2`,
       [streak, id]
     );
-    );
     res.redirect('/');
   } catch (err) {
     res.status(500).send("Check-in Error: " + err.message);
