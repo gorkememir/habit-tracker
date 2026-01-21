@@ -37,6 +37,7 @@ jobs:
           sed -i "s|image: gorkememir/habit-tracker:.*|image: gorkememir/habit-tracker:${{ github.sha }}|g" k8s/habit-app.yml
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B release
           git add k8s/habit-app.yml
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update image to ${{ github.sha }}" && git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update image to ${{ github.sha }}" && git tag -a "v${{ github.run_number }}" -m "Release version ${{ github.run_number }}" && git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git release --tags)
 

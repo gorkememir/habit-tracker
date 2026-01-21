@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/gorkememir/habit-tracker
-    targetRevision: main
+    targetRevision: release
     path: k8s
   destination:
     server: https://kubernetes.default.svc
