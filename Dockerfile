@@ -10,8 +10,8 @@ ENV COMMIT_MESSAGE=${COMMIT_MESSAGE}
 # Copy package files first for better caching
 COPY package*.json ./
 
-# Use npm ci for faster, more reliable installs
-RUN npm ci --only=production
+# Install production dependencies
+RUN npm install --production
 
 # Copy application code
 COPY . . 
