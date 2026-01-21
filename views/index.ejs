@@ -529,16 +529,51 @@
             </div>
             
             <div class="sort-controls">
-                <a href="/?sort=newest" class="sort-btn <%= sortBy === 'newest' ? 'active' : '' %>">🆕 Newest</a>
-                <a href="/?sort=oldest" class="sort-btn <%= sortBy === 'oldest' ? 'active' : '' %>">📅 Oldest</a>
-                <a href="/?sort=streak" class="sort-btn <%= sortBy === 'streak' ? 'active' : '' %>">🔥 Streak</a>
-                <a href="/?sort=alphabetical" class="sort-btn <%= sortBy === 'alphabetical' ? 'active' : '' %>">🔤 A-Z</a>
+                <a href="/?category=all&sort=<%= sortBy %>" class="sort-btn <%= filterCategory === 'all' ? 'active' : '' %>">All</a>
+                <% categories.forEach(cat => { %>
+                    <a href="/?category=<%= cat.id %>&sort=<%= sortBy %>" class="sort-btn <%= filterCategory == cat.id ? 'active' : '' %>" style="border-color: <%= cat.color %>"><%= cat.icon %> <%= cat.name %></a>
+                <% }) %>
+            </div>
+            
+            <div class="sort-controls">
+                <a href="/?category=<%= filterCategory %>&sort=newest" class="sort-btn <%= sortBy === 'newest' ? 'active' : '' %>">🆕 Newest</a>
+                <a href="/?category=<%= filterCategory %>&sort=oldest" class="sort-btn <%= sortBy === 'oldest' ? 'active' : '' %>">📅 Oldest</a>
+                <a href="/?category=<%= filterCategory %>&sort=streak" class="sort-btn <%= sortBy === 'streak' ? 'active' : '' %>">🔥 Streak</a>
+                <a href="/?category=<%= filterCategory %>&sort=alphabetical" class="sort-btn <%= sortBy === 'alphabetical' ? 'active' : '' %>">🔤 A-Z</a>
             </div>
             <% } %>
             
             <div class="form-container">
                 <form action="/add" method="POST" id="addHabitForm">
                     <input type="text" name="habitName" id="habitNameInput" placeholder="Enter a new habit..." maxlength="100" required>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                        <div>
+                            <label style="font-size: 0.85rem; color: var(--text-secondary); display: block; margin-bottom: 4px;">Icon</label>
+                            <input type="text" name="icon" placeholder="✓" maxlength="2" style="text-align: center; font-size: 1.5rem;">
+                        </div>
+                        <div>
+                            <label style="font-size: 0.85rem; color: var(--text-secondary); display: block; margin-bottom: 4px;">Color</label>
+                            <input type="color" name="color" value="#667eea" style="height: 45px; padding: 2px;">
+                        </div>
+                    </div>
+                    
+                    <select name="categoryId" style="width: 100%; padding: 14px; margin-bottom: 12px; border: 2px solid var(--border-color); border-radius: 10px; background: var(--card-bg); color: var(--text-primary); font-size: 1rem;">
+                        <option value="">No Category</option>
+                        <% categories.forEach(cat => { %>
+                            <option value="<%= cat.id %>"><%= cat.icon %> <%= cat.name %></option>
+                        <% }) %>
+                    </select>
+                    
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 12px;">
+                        <select name="goalFrequency" style="padding: 14px; border: 2px solid var(--border-color); border-radius: 10px; background: var(--card-bg); color: var(--text-primary); font-size: 1rem;">
+                            <option value="daily">Daily Goal</option>
+                            <option value="weekly">Weekly Goal</option>
+                            <option value="monthly">Monthly Goal</option>
+                        </select>
+                        <input type="number" name="goalCount" value="7" min="1" max="31" placeholder="Count" style="padding: 14px; text-align: center;">
+                    </div>
+                    
                     <label class="reminder-toggle">
                         <input type="checkbox" id="reminderToggle" onchange="toggleReminderInput()">
                         <span>Set a reminder time?</span>
@@ -580,16 +615,42 @@
                 <% } %>
 
                 <% habits.forEach(habit => { %>
-                    <li onclick="showHistory(<%= habit.id %>)">
+                    <li onclick="showHistory(<%= habit.id %>)" style="border-left: 4px solid <%= habit.color %>;">
                         <div class="habit-info">
-                            <strong><%= habit.name %></strong>
+                            <strong style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 1.5rem;"><%= habit.icon %></span>
+                                <span><%= habit.name %></span>
+                                <% if (habit.categoryName) { %>
+                                    <span style="background: <%= habit.categoryColor %>20; color: <%= habit.categoryColor %>; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 500;"><%= habit.categoryIcon %> <%= habit.categoryName %></span>
+                                <% } %>
+                            </strong>
                             <small>📅 Started <%= new Date(habit.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) %> • <%= habit.totalCompletions %> completions
                             <% if (habit.reminderTime) { %>
                                 • ⏰ <%= habit.reminderTime.substring(0, 5) %>
                             <% } %>
                             </small>
-                            <% if (habit.streak > 0) { %>
-                                <span class="streak">🔥 <%= habit.streak %> day<%= habit.streak > 1 ? 's' : '' %> streak</span>
+                            
+                            <div style="display: flex; gap: 10px; align-items: center; margin-top: 8px; flex-wrap: wrap;">
+                                <% if (habit.streak > 0) { %>
+                                    <span class="streak">🔥 <%= habit.streak %> day<%= habit.streak > 1 ? 's' : '' %></span>
+                                <% } %>
+                                <% if (habit.bestStreak > 0) { %>
+                                    <span style="background: #fbbf2420; color: #f59e0b; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">🏆 Best: <%= habit.bestStreak %></span>
+                                <% } %>
+                                <% if (habit.goalFrequency) { %>
+                                    <div style="flex: 1; min-width: 150px;">
+                                        <div style="font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 2px;"><%= habit.goalFrequency.charAt(0).toUpperCase() + habit.goalFrequency.slice(1) %> Goal: <%= habit.goalProgress %>/<%= habit.goalTarget %></div>
+                                        <div style="background: var(--border-color); height: 6px; border-radius: 3px; overflow: hidden;">
+                                            <div style="background: linear-gradient(90deg, #667eea, #764ba2); height: 100%; width: <%= habit.goalPercentage %>%; transition: width 0.3s;"></div>
+                                        </div>
+                                    </div>
+                                <% } %>
+                            </div>
+                            
+                            <% if (habit.todayNote) { %>
+                                <div style="margin-top: 8px; padding: 8px; background: #f3f4f620; border-radius: 8px; font-size: 0.85rem; color: var(--text-secondary);">
+                                    💭 "<%= habit.todayNote %>"
+                                </div>
                             <% } %>
                         </div>
                         
@@ -597,9 +658,9 @@
                             <% if (habit.checkedInToday) { %>
                                 <button type="button" class="btn-undo" onclick="undoCheckIn(<%= habit.id %>)">↩️ Undo</button>
                             <% } else { %>
-                                <button type="button" class="btn-checkin" onclick="checkIn(<%= habit.id %>, event)">✓ Check In</button>
+                                <button type="button" class="btn-checkin" onclick="checkInWithNote(<%= habit.id %>, event)">✓ Check In</button>
                             <% } %>
-                            <button class="btn-edit" onclick="editHabit(<%= habit.id %>, '<%= habit.name.replace(/'/g, "\\'") %>', '<%= habit.reminderTime || '' %>')" title="Edit">✏️</button>
+                            <button class="btn-edit" onclick="editHabitFull(<%= habit.id %>, '<%= habit.name.replace(/'/g, "\\'") %>', '<%= habit.reminderTime || '' %>', '<%= habit.categoryId || '' %>', '<%= habit.goalFrequency %>', '<%= habit.goalCount %>', '<%= habit.color %>', '<%= habit.icon %>')" title="Edit">✏️</button>
                             <button type="button" class="btn-delete" onclick="deleteHabit(<%= habit.id %>)" title="Delete">🗑️</button>
                         </div>
                     </li>
@@ -632,6 +693,34 @@
             </div>
             <form id="editForm" method="POST">
                 <input type="text" id="editInput" name="habitName" maxlength="100" required>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <div>
+                        <label style="font-size: 0.85rem; color: var(--text-secondary); display: block; margin-bottom: 4px;">Icon</label>
+                        <input type="text" id="editIcon" name="icon" placeholder="✓" maxlength="2" style="text-align: center; font-size: 1.5rem;">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.85rem; color: var(--text-secondary); display: block; margin-bottom: 4px;">Color</label>
+                        <input type="color" id="editColor" name="color" value="#667eea" style="height: 45px; padding: 2px;">
+                    </div>
+                </div>
+                
+                <select id="editCategory" name="categoryId" style="width: 100%; padding: 14px; margin-bottom: 12px; border: 2px solid var(--border-color); border-radius: 10px; background: var(--card-bg); color: var(--text-primary); font-size: 1rem;">
+                    <option value="">No Category</option>
+                    <% categories.forEach(cat => { %>
+                        <option value="<%= cat.id %>"><%= cat.icon %> <%= cat.name %></option>
+                    <% }) %>
+                </select>
+                
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <select id="editGoalFrequency" name="goalFrequency" style="padding: 14px; border: 2px solid var(--border-color); border-radius: 10px; background: var(--card-bg); color: var(--text-primary); font-size: 1rem;">
+                        <option value="daily">Daily Goal</option>
+                        <option value="weekly">Weekly Goal</option>
+                        <option value="monthly">Monthly Goal</option>
+                    </select>
+                    <input type="number" id="editGoalCount" name="goalCount" value="7" min="1" max="31" style="padding: 14px; text-align: center;">
+                </div>
+                
                 <label class="reminder-toggle">
                     <input type="checkbox" id="editReminderToggle" onchange="toggleEditReminderInput()">
                     <span>Set a reminder time?</span>
@@ -672,6 +761,24 @@
         }
         
         // AJAX form submissions
+        async function checkInWithNote(habitId, event) {
+            const note = prompt('Add a note about today (optional):');
+            try {
+                celebrate(event);
+                const response = await fetch(`/checkin/${habitId}`, { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ note: note || '' })
+                });
+                if (response.ok) {
+                    location.reload();
+                }
+            } catch (err) {
+                console.error('Error checking in:', err);
+                alert('Failed to check in');
+            }
+        }
+        
         async function checkIn(habitId, event) {
             try {
                 celebrate(event);
@@ -797,20 +904,34 @@
         }
 
         // Edit habit
-        function editHabit(id, name, reminderTime) {
+        function editHabitFull(id, name, reminderTime, categoryId, goalFrequency, goalCount, color, icon) {
             const modal = document.getElementById('editModal');
             const form = document.getElementById('editForm');
             const input = document.getElementById('editInput');
             const timeInput = document.getElementById('editReminderTime');
             const toggle = document.getElementById('editReminderToggle');
+            const categorySelect = document.getElementById('editCategory');
+            const goalFreqSelect = document.getElementById('editGoalFrequency');
+            const goalCountInput = document.getElementById('editGoalCount');
+            const colorInput = document.getElementById('editColor');
+            const iconInput = document.getElementById('editIcon');
             
             form.action = `/edit/${id}`;
             input.value = name;
             timeInput.value = reminderTime || '';
             toggle.checked = !!reminderTime;
             timeInput.classList.toggle('active', !!reminderTime);
+            if (categorySelect) categorySelect.value = categoryId || '';
+            if (goalFreqSelect) goalFreqSelect.value = goalFrequency || 'daily';
+            if (goalCountInput) goalCountInput.value = goalCount || 7;
+            if (colorInput) colorInput.value = color || '#667eea';
+            if (iconInput) iconInput.value = icon || '✓';
             modal.classList.add('active');
             input.focus();
+        }
+        
+        function editHabit(id, name, reminderTime) {
+            editHabitFull(id, name, reminderTime, '', 'daily', 7, '#667eea', '✓');
         }
 
         function closeEditModal() {

@@ -47,20 +47,53 @@ function getLocalDate(date = new Date()) {
 // 3. DATABASE INITIALIZATION (Self-Healing Schema)
 const initDb = async () => {
   try {
+    // Create categories table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS categories (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        color TEXT DEFAULT '#667eea',
+        icon TEXT DEFAULT '🎯'
+      )
+    `);
+
+    // Insert default categories if none exist
+    await pool.query(`
+      INSERT INTO categories (name, color, icon) VALUES
+        ('Health', '#10b981', '💪'),
+        ('Work', '#3b82f6', '💼'),
+        ('Learning', '#8b5cf6', '📚'),
+        ('Social', '#ec4899', '👥'),
+        ('Mindfulness', '#06b6d4', '🧘')
+      ON CONFLICT (name) DO NOTHING
+    `);
+
     // Create habits table if it doesn't exist
     await pool.query(`
       CREATE TABLE IF NOT EXISTS habits (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        reminder_time TIME
+        reminder_time TIME,
+        category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+        goal_frequency TEXT DEFAULT 'daily',
+        goal_count INTEGER DEFAULT 7,
+        best_streak INTEGER DEFAULT 0,
+        color TEXT DEFAULT '#667eea',
+        icon TEXT DEFAULT '✓'
       )
     `);
     
-    // Add reminder_time column if it doesn't exist (migration)
+    // Add new columns if they don't exist (migration)
     await pool.query(`
       ALTER TABLE habits 
-      ADD COLUMN IF NOT EXISTS reminder_time TIME
+      ADD COLUMN IF NOT EXISTS reminder_time TIME,
+      ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS goal_frequency TEXT DEFAULT 'daily',
+      ADD COLUMN IF NOT EXISTS goal_count INTEGER DEFAULT 7,
+      ADD COLUMN IF NOT EXISTS best_streak INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS color TEXT DEFAULT '#667eea',
+      ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT '✓'
     `);
 
     // Create completions table to track daily check-ins
@@ -69,8 +102,17 @@ const initDb = async () => {
         id SERIAL PRIMARY KEY,
         habit_id INTEGER REFERENCES habits(id) ON DELETE CASCADE,
         completed_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        note TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(habit_id, completed_date)
       )
+    `);
+
+    // Add note column if it doesn't exist (migration)
+    await pool.query(`
+      ALTER TABLE completions
+      ADD COLUMN IF NOT EXISTS note TEXT,
+      ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     `);
 
     console.log("✅ Database is ready and schema is up to date.");
@@ -131,8 +173,17 @@ app.get('/', async (req, res) => {
   try {
     const today = getLocalDate();
     const sortBy = req.query.sort || 'newest';
+    const filterCategory = req.query.category || 'all';
+    const view = req.query.view || 'list';
+    
+    // Fetch categories
+    const categoriesResult = await pool.query('SELECT * FROM categories ORDER BY name');
+    const categories = categoriesResult.rows;
     
     // Fetch all data in one optimized query
+    const categoryFilter = filterCategory !== 'all' ? 'AND h.category_id = $2' : '';
+    const params = filterCategory !== 'all' ? [today, filterCategory] : [today];
+    
     const result = await pool.query(`
       WITH habit_completions AS (
         SELECT 
@@ -140,14 +191,27 @@ app.get('/', async (req, res) => {
           h.name,
           h.created_at,
           h.reminder_time,
+          h.category_id,
+          h.goal_frequency,
+          h.goal_count,
+          h.best_streak,
+          h.color,
+          h.icon,
+          c.id as completion_id,
           c.completed_date,
+          c.note,
+          cat.name as category_name,
+          cat.color as category_color,
+          cat.icon as category_icon,
           CASE WHEN c.completed_date = $1 THEN true ELSE false END as checked_today
         FROM habits h
         LEFT JOIN completions c ON h.id = c.habit_id
+        LEFT JOIN categories cat ON h.category_id = cat.id
+        WHERE 1=1 ${categoryFilter}
         ORDER BY h.created_at DESC, c.completed_date DESC
       )
       SELECT * FROM habit_completions
-    `, [today]);
+    `, params);
     
     // Group by habit and calculate streaks
     const habitsMap = new Map();
@@ -159,7 +223,17 @@ app.get('/', async (req, res) => {
           name: row.name,
           created_at: row.created_at,
           reminderTime: row.reminder_time,
+          categoryId: row.category_id,
+          categoryName: row.category_name,
+          categoryColor: row.category_color,
+          categoryIcon: row.category_icon,
+          goalFrequency: row.goal_frequency,
+          goalCount: row.goal_count,
+          bestStreak: row.best_streak,
+          color: row.color,
+          icon: row.icon,
           checkedInToday: false,
+          todayNote: null,
           streak: 0,
           completions: [],
           totalCompletions: 0
@@ -167,21 +241,27 @@ app.get('/', async (req, res) => {
       }
       
       const habit = habitsMap.get(row.id);
-      if (row.checked_today) habit.checkedInToday = true;
+      if (row.checked_today) {
+        habit.checkedInToday = true;
+        habit.todayNote = row.note;
+      }
       if (row.completed_date) {
-        habit.completions.push(row.completed_date);
+        habit.completions.push({
+          date: row.completed_date,
+          note: row.note
+        });
         habit.totalCompletions++;
       }
     }
     
-    // Calculate streaks for each habit
+    // Calculate streaks and goal progress for each habit
     let enrichedHabits = Array.from(habitsMap.values()).map(habit => {
       let streak = 0;
       const todayDate = new Date(today);
       todayDate.setHours(0, 0, 0, 0);
       
       for (let i = 0; i < habit.completions.length; i++) {
-        const completedDate = new Date(habit.completions[i]);
+        const completedDate = new Date(habit.completions[i].date);
         completedDate.setHours(0, 0, 0, 0);
         
         const expectedDate = new Date(todayDate);
@@ -194,7 +274,30 @@ app.get('/', async (req, res) => {
         }
       }
       
-      return { ...habit, streak };
+      // Calculate goal progress
+      let goalProgress = 0;
+      let goalTarget = habit.goalCount;
+      
+      if (habit.goalFrequency === 'daily') {
+        goalProgress = habit.checkedInToday ? 1 : 0;
+        goalTarget = 1;
+      } else if (habit.goalFrequency === 'weekly') {
+        const weekAgo = new Date(todayDate);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        goalProgress = habit.completions.filter(c => new Date(c.date) >= weekAgo).length;
+      } else if (habit.goalFrequency === 'monthly') {
+        const monthAgo = new Date(todayDate);
+        monthAgo.setMonth(monthAgo.getMonth() - 1);
+        goalProgress = habit.completions.filter(c => new Date(c.date) >= monthAgo).length;
+      }
+      
+      return { 
+        ...habit, 
+        streak,
+        goalProgress,
+        goalTarget,
+        goalPercentage: Math.min(100, Math.round((goalProgress / goalTarget) * 100))
+      };
     });
     
     // Apply sorting
@@ -219,11 +322,21 @@ app.get('/', async (req, res) => {
       totalCompletionsThisWeek: enrichedHabits.reduce((sum, h) => {
         const weekAgo = new Date(today);
         weekAgo.setDate(weekAgo.getDate() - 7);
-        return sum + h.completions.filter(d => new Date(d) >= weekAgo).length;
-      }, 0)
+        return sum + h.completions.filter(c => new Date(c.date) >= weekAgo).length;
+      }, 0),
+      avgCompletion: enrichedHabits.length > 0 
+        ? Math.round((enrichedHabits.filter(h => h.checkedInToday).length / enrichedHabits.length) * 100)
+        : 0
     };
     
-    res.render('index', { habits: enrichedHabits, stats, sortBy });
+    res.render('index', { 
+      habits: enrichedHabits, 
+      stats, 
+      sortBy, 
+      categories, 
+      filterCategory,
+      view 
+    });
   } catch (err) {
     console.error('Error loading habits:', err);
     res.status(500).send("Database Error: " + err.message);
@@ -232,7 +345,7 @@ app.get('/', async (req, res) => {
 
 // Add a Habit
 app.post('/add', async (req, res) => {
-  const { habitName, reminderTime } = req.body;
+  const { habitName, reminderTime, categoryId, goalFrequency, goalCount, color, icon } = req.body;
   
   if (!habitName || habitName.trim().length === 0) {
     return res.status(400).send('Habit name is required');
@@ -244,8 +357,17 @@ app.post('/add', async (req, res) => {
   
   try {
     await pool.query(
-      'INSERT INTO habits (name, reminder_time) VALUES ($1, $2)',
-      [habitName.trim(), reminderTime || null]
+      `INSERT INTO habits (name, reminder_time, category_id, goal_frequency, goal_count, color, icon) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        habitName.trim(), 
+        reminderTime || null,
+        categoryId || null,
+        goalFrequency || 'daily',
+        goalCount || 7,
+        color || '#667eea',
+        icon || '✓'
+      ]
     );
     res.redirect('/');
   } catch (err) {
@@ -257,13 +379,52 @@ app.post('/add', async (req, res) => {
 // Check-in for today
 app.post('/checkin/:id', async (req, res) => {
   const { id } = req.params;
+  const { note } = req.body;
   const today = getLocalDate();
   
   try {
-    // Insert or ignore if already checked in today
+    // Insert or update if already checked in today
     await pool.query(
-      'INSERT INTO completions (habit_id, completed_date) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-      [id, today]
+      `INSERT INTO completions (habit_id, completed_date, note) 
+       VALUES ($1, $2, $3) 
+       ON CONFLICT (habit_id, completed_date) 
+       DO UPDATE SET note = $3`,
+      [id, today, note || null]
+    );
+    
+    // Update best streak if current streak is higher
+    const streakResult = await pool.query(
+      `SELECT completed_date FROM completions 
+       WHERE habit_id = $1 
+       ORDER BY completed_date DESC`,
+      [id]
+    );
+    
+    let streak = 0;
+    const todayDate = new Date(today);
+    todayDate.setHours(0, 0, 0, 0);
+    
+    for (let i = 0; i < streakResult.rows.length; i++) {
+      const completedDate = new Date(streakResult.rows[i].completed_date);
+      completedDate.setHours(0, 0, 0, 0);
+      
+      const expectedDate = new Date(todayDate);
+      expectedDate.setDate(todayDate.getDate() - i);
+      
+      if (completedDate.getTime() === expectedDate.getTime()) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    
+    // Update best streak if current is better
+    await pool.query(
+      `UPDATE habits 
+       SET best_streak = GREATEST(best_streak, $1) 
+       WHERE id = $2`,
+      [streak, id]
+    );
     );
     res.redirect('/');
   } catch (err) {
@@ -303,7 +464,7 @@ app.post('/undo/:id', async (req, res) => {
 // Edit habit name
 app.post('/edit/:id', async (req, res) => {
   const { id } = req.params;
-  const { habitName, reminderTime } = req.body;
+  const { habitName, reminderTime, categoryId, goalFrequency, goalCount, color, icon } = req.body;
   
   if (!habitName || habitName.trim().length === 0) {
     return res.status(400).send('Habit name is required');
@@ -315,8 +476,10 @@ app.post('/edit/:id', async (req, res) => {
   
   try {
     await pool.query(
-      'UPDATE habits SET name = $1, reminder_time = $2 WHERE id = $3',
-      [habitName.trim(), reminderTime || null, id]
+      `UPDATE habits 
+       SET name = $1, reminder_time = $2, category_id = $3, goal_frequency = $4, goal_count = $5, color = $6, icon = $7
+       WHERE id = $8`,
+      [habitName.trim(), reminderTime || null, categoryId || null, goalFrequency || 'daily', goalCount || 7, color || '#667eea', icon || '✓', id]
     );
     res.redirect('/');
   } catch (err) {
@@ -328,13 +491,14 @@ app.post('/edit/:id', async (req, res) => {
 // Get completion history for a habit (API endpoint)
 app.get('/api/history/:id', async (req, res) => {
   const { id } = req.params;
+  const { days = 90 } = req.query;
   
   try {
     const result = await pool.query(
-      `SELECT h.name, c.completed_date 
+      `SELECT h.name, h.icon, h.color, c.completed_date, c.note
        FROM habits h 
        LEFT JOIN completions c ON h.id = c.habit_id 
-       WHERE h.id = $1 
+       WHERE h.id = $1 AND c.completed_date >= CURRENT_DATE - INTERVAL '${days} days'
        ORDER BY c.completed_date DESC`,
       [id]
     );
