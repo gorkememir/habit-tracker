@@ -144,49 +144,128 @@ kubectl apply -f k8s/argocd-app.yaml
 ## Architecture
 
 ```
-┌─────────────┐
-│   ArgoCD    │ ─── Monitors GitHub repo
-└─────────────┘
-       │
-       ▼
-┌─────────────────────────────┐
-│      Kubernetes Cluster     │
-│  ┌─────────────────────┐   │
-│  │  habit-tracker      │   │
-│  │  (2 replicas)       │   │
-│  └─────────────────────┘   │
-│           │                  │
-│  ┌─────────────────────┐   │
-│  │   PostgreSQL DB     │   │
-│  └─────────────────────┘   │
-└─────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│              GitHub Repository                    │
+│  ┌──────────┐              ┌────────────┐       │
+│  │   main   │              │  release   │       │
+│  └────┬─────┘              └─────▲──────┘       │
+│       │                           │              │
+└───────┼───────────────────────────┼──────────────┘
+        │                           │
+        ▼                           │
+┌─────────────────┐                 │
+│ GitHub Actions  │─────────────────┘
+│ • Build Docker  │
+│ • Push to Hub   │
+│ • Semantic Ver  │
+│ • Update K8s    │
+└─────────────────┘
+                                    
+┌───────────────────────────────────────────┐
+│            Kubernetes Cluster             │
+│                                           │
+│  ┌─────────────┐                         │
+│  │   ArgoCD    │ ← Watches release branch│
+│  └──────┬──────┘                         │
+│         │ (syncs every 30s)              │
+│         ▼                                 │
+│  ┌──────────────────────┐                │
+│  │  habit-tracker-app   │                │
+│  │    (2 replicas)      │                │
+│  │  NodePort: 30007     │                │
+│  └──────────┬───────────┘                │
+│             │                             │
+│  ┌──────────▼───────────┐                │
+│  │   PostgreSQL DB      │                │
+│  │   (StatefulSet)      │                │
+│  └──────────────────────┘                │
+└───────────────────────────────────────────┘
+```
+
+## GitOps Workflow
+
+```
+Developer                GitHub Actions           ArgoCD              Kubernetes
+    │                          │                     │                     │
+    │ git push main           │                     │                     │
+    ├─────────────────────────>│                     │                     │
+    │                          │ Build & Push        │                     │
+    │                          │ Docker Image        │                     │
+    │                          ├──────────>          │                     │
+    │                          │                     │                     │
+    │                          │ Create version tag  │                     │
+    │                          │ (v1.2.3)           │                     │
+    │                          │                     │                     │
+    │                          │ Update manifest     │                     │
+    │                          │ Push to release     │                     │
+    │                          ├────────────────────>│                     │
+    │                          │                     │                     │
+    │                          │                     │ Detect change       │
+    │                          │                     │ (30s poll)          │
+    │                          │                     │                     │
+    │                          │                     │ Sync & Deploy       │
+    │                          │                     ├────────────────────>│
+    │                          │                     │                     │
+    │<──────────────────────────────────────────────┴─────────────────────┤
+    │                    App deployed with new version                     │
 ```
 
 ## Project Structure
 
 ```
 habit-tracker/
-├── app.js                 # Main application
-├── Dockerfile            # Container image definition
-├── package.json          # Node.js dependencies
-├── views/                # EJS templates
-├── k8s/                  # Kubernetes manifests
-│   └── habit-app.yml    # Deployment & Service
-└── argocd-app.yaml      # ArgoCD application config
+├── .github/
+│   └── workflows/
+│       └── deploy.yml        # CI/CD pipeline with semantic versioning
+├── app.js                    # Main application
+├── Dockerfile                # Container image definition
+├── package.json              # Node.js dependencies
+├── views/
+│   └── index.ejs            # Frontend template with dark mode
+├── k8s/
+│   ├── habit-app.yml        # App Deployment & Service
+│   ├── postgres.yml         # PostgreSQL StatefulSet
+│   └── argocd-app.yaml      # ArgoCD application config
+└── README.md                 # This file
 ```
+
+## Configuration
+
+### GitHub Secrets Required
+- `DOCKERHUB_USERNAME`: Docker Hub username
+- `DOCKERHUB_TOKEN`: Docker Hub access token
+- `GITHUB_TOKEN`: Auto-provided by GitHub Actions
+
+### Commit Message Convention
+
+Use conventional commits for automatic semantic versioning:
+
+- `feat: add new feature` → Minor version bump (v1.1.0)
+- `fix: resolve bug` → Patch version bump (v1.0.1)  
+- `feat!: breaking change` → Major version bump (v2.0.0)
+- `docs: update readme` → Patch version bump (v1.0.1)
+- `BREAKING CHANGE:` in body → Major version bump (v2.0.0)
 
 ## Environment
 
 - **Kubernetes**: Self-hosted on Proxmox
 - **Docker Registry**: Docker Hub (gorkememir/habit-tracker)
+- **Branches**: 
+  - `main`: Development branch
+  - `release`: Production branch (watched by ArgoCD)
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to GitHub
-5. ArgoCD automatically deploys to cluster
+2. Create a feature branch (`git checkout -b feat/amazing-feature`)
+3. Commit your changes using conventional commits
+4. Push to the branch (`git push origin feat/amazing-feature`)
+5. Open a Pull Request to `main`
+6. After merge, GitHub Actions will:
+   - Build and push Docker image
+   - Create semantic version tag
+   - Update `release` branch
+   - ArgoCD automatically deploys to cluster
 
 ## License
 
