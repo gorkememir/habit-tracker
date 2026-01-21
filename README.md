@@ -1,14 +1,17 @@
 # Habit Tracker
 
-A simple habit tracking web application built with Node.js, Express, PostgreSQL, and deployed on Kubernetes with ArgoCD.
+A simple habit tracking web application built with Node.js, Express, PostgreSQL, and deployed on Kubernetes with GitOps using ArgoCD.
 
 ## Features
 
 - ✅ Add and track daily habits
 - 🗑️ Delete habits
 - 📊 View all habits with timestamps
+- 🌓 Dark mode support
+- 📤 Export habits to CSV
 - 🔄 Self-healing database schema
-- 🚀 Auto-deployed via ArgoCD
+- 🚀 Automated CI/CD with semantic versioning
+- 🎯 GitOps deployment via ArgoCD
 
 ## Tech Stack
 
@@ -17,8 +20,9 @@ A simple habit tracking web application built with Node.js, Express, PostgreSQL,
 - **Frontend**: EJS templates
 - **Containerization**: Docker
 - **Orchestration**: Kubernetes
-- **CI/CD**: ArgoCD
+- **CI/CD**: GitHub Actions + ArgoCD (GitOps)
 - **Infrastructure**: Proxmox
+- **Registry**: Docker Hub
 
 ## Local Development
 
@@ -73,6 +77,29 @@ docker push gorkememir/habit-tracker:latest
 
 ## Kubernetes Deployment
 
+### Prerequisites
+- Kubernetes cluster (self-hosted on Proxmox)
+- ArgoCD installed
+- Docker Hub credentials configured in GitHub Secrets
+
+### CI/CD Pipeline
+
+The project uses a GitOps workflow with semantic versioning:
+
+1. **Developer pushes to `main` branch**
+2. **GitHub Actions workflow triggers:**
+   - Builds Docker image with commit SHA tag
+   - Pushes to Docker Hub
+   - Determines semantic version from commit message:
+     - `feat:` → minor bump (v1.1.0)
+     - `fix:` → patch bump (v1.0.1)
+     - `feat!:` or `BREAKING CHANGE:` → major bump (v2.0.0)
+   - Updates manifest in `release` branch with new image
+   - Creates version tag (e.g., v1.2.3)
+3. **ArgoCD watches `release` branch**
+   - Auto-syncs changes to Kubernetes (30s interval)
+   - Deploys new version to cluster
+
 ### Manual Deployment
 
 1. Create namespace:
@@ -80,12 +107,17 @@ docker push gorkememir/habit-tracker:latest
 kubectl create namespace habit-tracker
 ```
 
-2. Apply manifests:
+2. Apply PostgreSQL:
+```bash
+kubectl apply -f k8s/postgres.yml
+```
+
+3. Apply application:
 ```bash
 kubectl apply -f k8s/habit-app.yml
 ```
 
-3. Access the app:
+4. Access the app:
 ```
 http://<NODE_IP>:30007
 ```
@@ -100,13 +132,14 @@ kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/st
 
 2. Apply the ArgoCD application:
 ```bash
-kubectl apply -f argocd-app.yaml
+kubectl apply -f k8s/argocd-app.yaml
 ```
 
 3. ArgoCD will automatically:
-   - Monitor the GitHub repository
-   - Sync changes to the cluster
-   - Self-heal any drift
+   - Monitor the `release` branch
+   - Sync changes to the cluster every 30 seconds
+   - Self-heal any configuration drift
+   - Prune deleted resources
 
 ## Architecture
 
