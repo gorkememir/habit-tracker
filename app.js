@@ -213,6 +213,11 @@ app.get('/', async (req, res) => {
     }
     
     // Calculate stats
+    const totalAllTimeCompletions = enrichedHabits.reduce((sum, h) => sum + h.totalCompletions, 0);
+    const completionRate = enrichedHabits.length > 0 
+      ? Math.round((enrichedHabits.filter(h => h.checkedInToday).length / enrichedHabits.length) * 100)
+      : 0;
+    
     const stats = {
       totalHabits: enrichedHabits.length,
       completedToday: enrichedHabits.filter(h => h.checkedInToday).length,
@@ -220,7 +225,9 @@ app.get('/', async (req, res) => {
         const weekAgo = new Date(today);
         weekAgo.setDate(weekAgo.getDate() - 7);
         return sum + h.completions.filter(d => new Date(d) >= weekAgo).length;
-      }, 0)
+      }, 0),
+      totalAllTime: totalAllTimeCompletions,
+      completionRate: completionRate
     };
     
     res.render('index', { habits: enrichedHabits, stats, sortBy });
