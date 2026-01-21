@@ -55,22 +55,21 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -B release
           
-          # Update image
-          sed -i "s|image: gorkememir/habit-tracker:.*|image: gorkememir/habit-tracker:${{ github.sha }}|g" k8s/habit-app.yml
+          # Install yq for YAML processing
+          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+          chmod +x /usr/local/bin/yq
           
-          # Add version label to deployment metadata if not exists
-          if ! grep -q "version:" k8s/habit-app.yml; then
-            sed -i '/metadata:/a\  labels:\n    version: ${{ steps.tag_version.outputs.new_tag }}' k8s/habit-app.yml
-          else
-            sed -i "s|version:.*|version: ${{ steps.tag_version.outputs.new_tag }}|g" k8s/habit-app.yml
-          fi
+          # Update image
+          yq eval '.spec.template.spec.containers[0].image = "gorkememir/habit-tracker:${{ github.sha }}"' -i k8s/habit-app.yml
+          
+          # Add version label to deployment
+          yq eval '.metadata.labels.version = "${{ steps.tag_version.outputs.new_tag }}"' -i k8s/habit-app.yml
           
           # Add version annotation to pod template
-          if ! grep -q "app.version:" k8s/habit-app.yml; then
-            sed -i '/template:/a\    metadata:\n      annotations:\n        app.version: "${{ steps.tag_version.outputs.new_tag }}"' k8s/habit-app.yml
-          else
-            sed -i "s|app.version:.*|app.version: \"${{ steps.tag_version.outputs.new_tag }}\"|g" k8s/habit-app.yml
-          fi
+          yq eval '.spec.template.metadata.annotations."app.version" = "${{ steps.tag_version.outputs.new_tag }}"' -i k8s/habit-app.yml
+          
+          # Add version label to service
+          yq eval 'select(document_index == 1) | .metadata.labels.version = "${{ steps.tag_version.outputs.new_tag }}"' -i k8s/habit-app.yml
           
           git add k8s/habit-app.yml
           git diff --quiet && git diff --staged --quiet || (git commit -m "Update image to ${{ github.sha }} (${{ steps.tag_version.outputs.new_tag }})" && git push --force https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git release)
