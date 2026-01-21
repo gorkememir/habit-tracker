@@ -7,11 +7,13 @@ ARG COMMIT_MESSAGE=unknown
 ENV COMMIT_SHA=${COMMIT_SHA}
 ENV COMMIT_MESSAGE=${COMMIT_MESSAGE}
 
-# Install dependencies (including ejs)
+# Copy package files first for better caching
 COPY package*.json ./
-RUN npm install express pg ejs
 
-# IMPORTANT: This copies EVERYTHING (including the views folder)
+# Use npm ci for faster, more reliable installs
+RUN npm ci --only=production
+
+# Copy application code
 COPY . . 
 
 EXPOSE 8080
