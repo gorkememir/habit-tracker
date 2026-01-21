@@ -1,6 +1,6 @@
 # Habit Tracker
 
-A simple habit tracking web application built with Node.js, Express, PostgreSQL, and deployed on Kubernetes with GitOps using ArgoCD.
+A habit tracking web application built with Node.js, Express, PostgreSQL, and deployed on Kubernetes with GitOps using ArgoCD.
 
 ## Features
 
