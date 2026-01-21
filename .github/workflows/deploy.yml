@@ -36,9 +36,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch origin release:release || true
-          git checkout release || git checkout -b release
+          git checkout -B release
           sed -i "s|image: gorkememir/habit-tracker:.*|image: gorkememir/habit-tracker:${{ github.sha }}|g" k8s/habit-app.yml
           git add k8s/habit-app.yml
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update image to ${{ github.sha }}" && git tag -a "v${{ github.run_number }}" -m "Release version ${{ github.run_number }}" && git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git release --tags)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update image to ${{ github.sha }}" && git tag -a "v${{ github.run_number }}" -m "Release version ${{ github.run_number }}" && git push --force https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git release --tags)
 
