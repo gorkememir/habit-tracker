@@ -1,0 +1,21 @@
+{
+  "name": "habit-tracker",
+  "version": "1.0.0",
+  "description": "A simple habit tracking application",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.11.3",
+    "ejs": "^3.1.9"
+  },
+  "keywords": [
+    "habits",
+    "tracker",
+    "productivity"
+  ],
+  "author": "",
+  "license": "MIT"
+}

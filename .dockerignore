@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log
+.git
+.github
+*.md
+.gitignore
+.dockerignore
+.env
+.DS_Store
+*.swp
+*.swo
+k8s
