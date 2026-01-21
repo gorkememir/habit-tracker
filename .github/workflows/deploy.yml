@@ -54,23 +54,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -B release
-          
-          # Install yq for YAML processing
-          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
-          chmod +x /usr/local/bin/yq
-          
-          # Update image
-          yq eval '.spec.template.spec.containers[0].image = "gorkememir/habit-tracker:${{ github.sha }}"' -i k8s/habit-app.yml
-          
-          # Add version label to deployment
-          yq eval '.metadata.labels.version = "${{ steps.tag_version.outputs.new_tag }}"' -i k8s/habit-app.yml
-          
-          # Add version annotation to pod template
-          yq eval '.spec.template.metadata.annotations."app.version" = "${{ steps.tag_version.outputs.new_tag }}"' -i k8s/habit-app.yml
-          
-          # Add version label to service
-          yq eval 'select(document_index == 1) | .metadata.labels.version = "${{ steps.tag_version.outputs.new_tag }}"' -i k8s/habit-app.yml
-          
+          sed -i "s|image: gorkememir/habit-tracker:.*|image: gorkememir/habit-tracker:${{ github.sha }}|g" k8s/habit-app.yml
           git add k8s/habit-app.yml
           git diff --quiet && git diff --staged --quiet || (git commit -m "Update image to ${{ github.sha }} (${{ steps.tag_version.outputs.new_tag }})" && git push --force https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git release)
 
