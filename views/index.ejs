@@ -63,18 +63,23 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 1.5rem;
+            flex-wrap: nowrap;
+            gap: 10px;
         }
         
         h2 { 
             color: var(--text-primary); 
-            font-size: 2rem;
+            font-size: 1.75rem;
             font-weight: 700;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
         
         .controls {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             align-items: center;
+            flex-shrink: 0;
         }
         
         .theme-toggle, .export-btn, .logout-btn {
@@ -536,7 +541,7 @@
                     <% if (user && user.picture) { %>
                         <img src="<%= user.picture %>" alt="<%= user.name %>" class="user-profile" title="<%= user.name %>" onclick="alert('Profile: <%= user.name %>\\nEmail: <%= user.email %>')">
                     <% } %>
-                    <a href="/logout" class="logout-btn" title="Logout">🚪 Logout</a>
+                    <a href="/logout" class="logout-btn" title="Logout">🚪</a>
                 </div>
             </div>
             
