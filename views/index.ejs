@@ -170,7 +170,7 @@
         .btn-add { 
             width: 100%; 
             padding: 14px; 
-            backgrocd und: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white; 
             border: none; 
             border-radius: 10px;
@@ -508,21 +508,11 @@
     <div class="container">
         <div class="card">
             <div class="header">
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <h2>🎯 Habit Tracker</h2>
-                    <div style="display: flex; align-items: center; gap: 10px; font-size: 0.9rem; color: var(--text-secondary);">
-                        <img src="<%= typeof user !== 'undefined' && user.picture ? user.picture : '' %>" 
-                             alt="Profile" 
-                             style="width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border-color);"
-                             onerror="this.style.display='none'">
-                        <span><%= typeof user !== 'undefined' && user.name ? user.name.split(' ')[0] : 'User' %></span>
-                    </div>
-                </div>
+                <h2>🎯 Habit Tracker</h2>
                 <div class="controls">
                     <button class="theme-toggle" onclick="toggleCalendar()" title="Toggle Calendar">📅</button>
                     <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">🌓</button>
                     <a href="/export" class="export-btn" title="Export to CSV">📥</a>
-                    <a href="/logout" class="export-btn" title="Logout">🚪</a>
                 </div>
             </div>
             
@@ -535,14 +525,6 @@
                 <div class="stat-card">
                     <div class="stat-value"><%= stats.totalCompletionsThisWeek %></div>
                     <div class="stat-label">This Week</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value"><%= stats.totalAllTime %></div>
-                    <div class="stat-label">All Time</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value"><%= stats.completionRate %>%</div>
-                    <div class="stat-label">Today's Rate</div>
                 </div>
             </div>
             
