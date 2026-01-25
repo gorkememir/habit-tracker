@@ -1,6 +1,9 @@
 const express = require('express');
 const path = require('path');
 const { Pool } = require('pg');
+const session = require('express-session');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
 const app = express();
 
@@ -12,6 +15,18 @@ app.set('view engine', 'ejs');
 // Middleware to parse form data (needed for Adding and Deleting)
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json()); // For API endpoints
+
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: process.env.NODE_ENV === 'production' }
+}));
+
+// Passport initialization
+app.use(passport.initialize());
+app.use(passport.session());
 
 // 2. DATABASE CONNECTION
 const pool = new Pool({
@@ -47,19 +62,33 @@ function getLocalDate(date = new Date()) {
 // 3. DATABASE INITIALIZATION (Self-Healing Schema)
 const initDb = async () => {
   try {
+    // Create users table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        google_id TEXT UNIQUE NOT NULL,
+        email TEXT NOT NULL,
+        name TEXT,
+        picture TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Create habits table if it doesn't exist
     await pool.query(`
       CREATE TABLE IF NOT EXISTS habits (
         id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         reminder_time TIME
       )
     `);
     
-    // Add reminder_time column if it doesn't exist (migration)
+    // Add user_id column if it doesn't exist (migration)
     await pool.query(`
       ALTER TABLE habits 
+      ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
       ADD COLUMN IF NOT EXISTS reminder_time TIME
     `);
 
@@ -79,6 +108,55 @@ const initDb = async () => {
   }
 };
 initDb();
+
+// 4. GOOGLE OAUTH CONFIGURATION
+passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:8080/auth/google/callback"
+  },
+  async (accessToken, refreshToken, profile, done) => {
+    try {
+      // Check if user exists
+      let result = await pool.query('SELECT * FROM users WHERE google_id = $1', [profile.id]);
+      
+      if (result.rows.length > 0) {
+        // User exists
+        return done(null, result.rows[0]);
+      } else {
+        // Create new user
+        const newUser = await pool.query(
+          'INSERT INTO users (google_id, email, name, picture) VALUES ($1, $2, $3, $4) RETURNING *',
+          [profile.id, profile.emails[0].value, profile.displayName, profile.photos[0]?.value]
+        );
+        return done(null, newUser.rows[0]);
+      }
+    } catch (err) {
+      return done(err, null);
+    }
+  }
+));
+
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
+
+passport.deserializeUser(async (id, done) => {
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    done(null, result.rows[0]);
+  } catch (err) {
+    done(err, null);
+  }
+});
+
+// Middleware to check if user is authenticated
+function ensureAuthenticated(req, res, next) {
+  if (req.isAuthenticated()) {
+    return next();
+  }
+  res.redirect('/login');
+}
 
 // Helper function to calculate streak
 const calculateStreak = async (habitId) => {
@@ -125,12 +203,41 @@ function getLocalDate(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
-// 4. ROUTES
+// 5. AUTHENTICATION ROUTES
+// Login page
+app.get('/login', (req, res) => {
+  if (req.isAuthenticated()) {
+    return res.redirect('/');
+  }
+  res.render('login');
+});
+
+// Google OAuth routes
+app.get('/auth/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+);
+
+app.get('/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  (req, res) => {
+    res.redirect('/');
+  }
+);
+
+// Logout
+app.get('/logout', (req, res) => {
+  req.logout(() => {
+    res.redirect('/login');
+  });
+});
+
+// 6. ROUTES
 // Home Page - View all habits (optimized with single query)
-app.get('/', async (req, res) => {
+app.get('/', ensureAuthenticated, async (req, res) => {
   try {
     const today = getLocalDate();
     const sortBy = req.query.sort || 'newest';
+    const userId = req.user.id;
     
     // Fetch all data in one optimized query
     const result = await pool.query(`
@@ -144,10 +251,11 @@ app.get('/', async (req, res) => {
           CASE WHEN c.completed_date = $1 THEN true ELSE false END as checked_today
         FROM habits h
         LEFT JOIN completions c ON h.id = c.habit_id
+        WHERE h.user_id = $2
         ORDER BY h.created_at DESC, c.completed_date DESC
       )
       SELECT * FROM habit_completions
-    `, [today]);
+    `, [today, userId]);
     
     // Group by habit and calculate streaks
     const habitsMap = new Map();
@@ -230,7 +338,7 @@ app.get('/', async (req, res) => {
       completionRate: completionRate
     };
     
-    res.render('index', { habits: enrichedHabits, stats, sortBy });
+    res.render('index', { habits: enrichedHabits, stats, sortBy, user: req.user });
   } catch (err) {
     console.error('Error loading habits:', err);
     res.status(500).send("Database Error: " + err.message);
@@ -238,8 +346,9 @@ app.get('/', async (req, res) => {
 });
 
 // Add a Habit
-app.post('/add', async (req, res) => {
+app.post('/add', ensureAuthenticated, async (req, res) => {
   const { habitName, reminderTime } = req.body;
+  const userId = req.user.id;
   
   if (!habitName || habitName.trim().length === 0) {
     return res.status(400).send('Habit name is required');
@@ -251,8 +360,8 @@ app.post('/add', async (req, res) => {
   
   try {
     await pool.query(
-      'INSERT INTO habits (name, reminder_time) VALUES ($1, $2)',
-      [habitName.trim(), reminderTime || null]
+      'INSERT INTO habits (user_id, name, reminder_time) VALUES ($1, $2, $3)',
+      [userId, habitName.trim(), reminderTime || null]
     );
     res.redirect('/');
   } catch (err) {

@@ -41,6 +41,25 @@ spec:
             secretKeyRef:
               name: postgres-secret
               key: POSTGRES_HOST
+        - name: GOOGLE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: google-oauth-secret
+              key: GOOGLE_CLIENT_ID
+        - name: GOOGLE_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: google-oauth-secret
+              key: GOOGLE_CLIENT_SECRET
+        - name: GOOGLE_CALLBACK_URL
+          value: "https://habits.emirpalace.ca/auth/google/callback"
+        - name: SESSION_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: google-oauth-secret
+              key: SESSION_SECRET
+        - name: NODE_ENV
+          value: "production"
 ---
 apiVersion: v1
 kind: Service

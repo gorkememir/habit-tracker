@@ -508,11 +508,21 @@
     <div class="container">
         <div class="card">
             <div class="header">
-                <h2>🎯 Habit Tracker</h2>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <h2>🎯 Habit Tracker</h2>
+                    <div style="display: flex; align-items: center; gap: 10px; font-size: 0.9rem; color: var(--text-secondary);">
+                        <img src="<%= typeof user !== 'undefined' && user.picture ? user.picture : '' %>" 
+                             alt="Profile" 
+                             style="width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border-color);"
+                             onerror="this.style.display='none'">
+                        <span><%= typeof user !== 'undefined' && user.name ? user.name.split(' ')[0] : 'User' %></span>
+                    </div>
+                </div>
                 <div class="controls">
                     <button class="theme-toggle" onclick="toggleCalendar()" title="Toggle Calendar">📅</button>
                     <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode">🌓</button>
                     <a href="/export" class="export-btn" title="Export to CSV">📥</a>
+                    <a href="/logout" class="export-btn" title="Logout">🚪</a>
                 </div>
             </div>
             
