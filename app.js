@@ -19,7 +19,7 @@ app.use(express.json()); // For API endpoints
 // Session configuration
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
-  resave: false,
+  resave: true, // Save session on every request to prevent loss with rapid clicks
   saveUninitialized: false,
   cookie: { 
     secure: false, // Cloudflare Tunnel terminates HTTPS, app receives HTTP
