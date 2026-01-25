@@ -5,7 +5,7 @@ metadata:
   namespace: habit-tracker
 spec:
   revisionHistoryLimit: 3
-  replicas: 2 # Running 2 copies for reliability
+  replicas: 1 # Temporary: Using 1 replica until we implement Redis session store
   selector:
     matchLabels:
       app: habit-tracker
