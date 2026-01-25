@@ -527,6 +527,61 @@
         #reminderTimeInput.active {
             display: block;
         }
+        
+        /* Mobile responsive styles */
+        @media (max-width: 640px) {
+            body {
+                padding: 10px;
+            }
+            
+            .card {
+                padding: 1.25rem;
+            }
+            
+            .header {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            
+            h2 {
+                font-size: 1.5rem;
+                flex: 0 0 100%;
+                margin-bottom: 8px;
+                white-space: normal;
+            }
+            
+            .controls {
+                gap: 6px;
+                width: 100%;
+                justify-content: space-between;
+            }
+            
+            .theme-toggle, .export-btn, .logout-btn {
+                padding: 6px 10px;
+                font-size: 1rem;
+            }
+            
+            .user-profile {
+                width: 32px;
+                height: 32px;
+            }
+            
+            .stats {
+                gap: 8px;
+            }
+            
+            .stat-card {
+                padding: 10px;
+            }
+            
+            .stat-value {
+                font-size: 1.5rem;
+            }
+            
+            .stat-label {
+                font-size: 0.7rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -541,7 +596,7 @@
                     <% if (user && user.picture) { %>
                         <img src="<%= user.picture %>" alt="<%= user.name %>" class="user-profile" title="<%= user.name %>" onclick="alert('Profile: <%= user.name %>\nEmail: <%= user.email %>')">
                     <% } %>
-                    <a href="/logout" class="logout-btn" title="Logout">👋</a>
+                    <a href="/logout" class="logout-btn" title="Logout">�➡️</a>
                 </div>
             </div>
             
