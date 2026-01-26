@@ -37,10 +37,7 @@ spec:
               name: postgres-secret
               key: POSTGRES_DB
         - name: POSTGRES_HOST
-          valueFrom:
-            secretKeyRef:
-              name: postgres-secret
-              key: POSTGRES_HOST
+          value: "192.168.2.138"
         - name: GOOGLE_CLIENT_ID
           valueFrom:
             secretKeyRef:
