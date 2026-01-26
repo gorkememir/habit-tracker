@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const { Pool } = require('pg');
 const session = require('express-session');
+const pgSession = require('connect-pg-simple')(session);
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
@@ -18,6 +19,11 @@ app.use(express.json()); // For API endpoints
 
 // Session configuration
 app.use(session({
+  store: new pgSession({
+    pool: pool,
+    tableName: 'session',
+    createTableIfMissing: true
+  }),
   secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,
