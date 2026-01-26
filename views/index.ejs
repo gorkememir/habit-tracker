@@ -643,13 +643,13 @@
             <div class="header">
                 <h2>🎯 Habit Tracker</h2>
                 <div class="controls">
-                    <button class="theme-toggle btn-tooltip" data-tooltip="View calendar" onclick="toggleCalendar()">📅</button>
-                    <button class="theme-toggle btn-tooltip" data-tooltip="Toggle dark mode" onclick="toggleTheme()">🌓</button>
-                    <a href="/export" class="export-btn btn-tooltip" data-tooltip="Download CSV">📥</a>
+                    <button class="theme-toggle" onclick="toggleCalendar()" title="View calendar">📅</button>
+                    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">🌓</button>
+                    <a href="/export" class="export-btn" title="Download CSV">📥</a>
                     <% if (user && user.picture) { %>
-                        <img src="<%= user.picture %>" alt="<%= user.name %>" class="user-profile btn-tooltip" data-tooltip="<%= user.name %>" onclick="alert('Profile: <%= user.name %>\nEmail: <%= user.email %>')">
+                        <img src="<%= user.picture %>" alt="<%= user.name %>" class="user-profile" title="<%= user.name %>" onclick="alert('Profile: <%= user.name %>\nEmail: <%= user.email %>')">
                     <% } %>
-                    <a href="/logout" class="logout-btn btn-tooltip" data-tooltip="Sign out">➡️</a>
+                    <a href="/logout" class="logout-btn" title="Sign out">➡️</a>
                 </div>
             </div>
             
