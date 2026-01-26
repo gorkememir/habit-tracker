@@ -19,11 +19,13 @@ app.use(express.json()); // For API endpoints
 // Session configuration
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
-  resave: true, // Save session on every request to prevent loss with rapid clicks
+  resave: false,
   saveUninitialized: false,
+  proxy: true, // Trust proxy (for Cloudflare Tunnel)
   cookie: { 
     secure: false, // Cloudflare Tunnel terminates HTTPS, app receives HTTP
     httpOnly: true,
+    sameSite: 'lax', // Allow same-site POST requests
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
@@ -375,11 +377,22 @@ app.post('/add', ensureAuthenticated, async (req, res) => {
 });
 
 // Check-in for today
-app.post('/checkin/:id', async (req, res) => {
+app.post('/checkin/:id', ensureAuthenticated, async (req, res) => {
   const { id } = req.params;
   const today = getLocalDate();
+  const userId = req.user.id;
   
   try {
+    // Verify habit belongs to user
+    const habitCheck = await pool.query(
+      'SELECT id FROM habits WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+    
+    if (habitCheck.rows.length === 0) {
+      return res.status(403).send('Unauthorized');
+    }
+    
     // Insert or ignore if already checked in today
     await pool.query(
       'INSERT INTO completions (habit_id, completed_date) VALUES ($1, $2) ON CONFLICT DO NOTHING',
@@ -392,10 +405,20 @@ app.post('/checkin/:id', async (req, res) => {
 });
 
 // Delete a Habit
-app.post('/delete/:id', async (req, res) => {
+app.post('/delete/:id', ensureAuthenticated, async (req, res) => {
   const { id } = req.params;
+  const userId = req.user.id;
+  
   try {
-    await pool.query('DELETE FROM habits WHERE id = $1', [id]);
+    const result = await pool.query(
+      'DELETE FROM habits WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+    
+    if (result.rowCount === 0) {
+      return res.status(403).send('Unauthorized');
+    }
+    
     res.redirect('/');
   } catch (err) {
     console.error('Error deleting habit:', err);
@@ -404,11 +427,22 @@ app.post('/delete/:id', async (req, res) => {
 });
 
 // Undo today's check-in
-app.post('/undo/:id', async (req, res) => {
+app.post('/undo/:id', ensureAuthenticated, async (req, res) => {
   const { id } = req.params;
   const today = getLocalDate();
+  const userId = req.user.id;
   
   try {
+    // Verify habit belongs to user
+    const habitCheck = await pool.query(
+      'SELECT id FROM habits WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+    
+    if (habitCheck.rows.length === 0) {
+      return res.status(403).send('Unauthorized');
+    }
+    
     await pool.query(
       'DELETE FROM completions WHERE habit_id = $1 AND completed_date = $2',
       [id, today]
@@ -421,9 +455,10 @@ app.post('/undo/:id', async (req, res) => {
 });
 
 // Edit habit name
-app.post('/edit/:id', async (req, res) => {
+app.post('/edit/:id', ensureAuthenticated, async (req, res) => {
   const { id } = req.params;
   const { habitName, reminderTime } = req.body;
+  const userId = req.user.id;
   
   if (!habitName || habitName.trim().length === 0) {
     return res.status(400).send('Habit name is required');
@@ -434,10 +469,15 @@ app.post('/edit/:id', async (req, res) => {
   }
   
   try {
-    await pool.query(
-      'UPDATE habits SET name = $1, reminder_time = $2 WHERE id = $3',
-      [habitName.trim(), reminderTime || null, id]
+    const result = await pool.query(
+      'UPDATE habits SET name = $1, reminder_time = $2 WHERE id = $3 AND user_id = $4',
+      [habitName.trim(), reminderTime || null, id, userId]
     );
+    
+    if (result.rowCount === 0) {
+      return res.status(403).send('Unauthorized');
+    }
+    
     res.redirect('/');
   } catch (err) {
     console.error('Error editing habit:', err);
@@ -446,17 +486,18 @@ app.post('/edit/:id', async (req, res) => {
 });
 
 // Get completion history for a habit (API endpoint)
-app.get('/api/history/:id', async (req, res) => {
+app.get('/api/history/:id', ensureAuthenticated, async (req, res) => {
   const { id } = req.params;
+  const userId = req.user.id;
   
   try {
     const result = await pool.query(
       `SELECT h.name, c.completed_date 
        FROM habits h 
        LEFT JOIN completions c ON h.id = c.habit_id 
-       WHERE h.id = $1 
+       WHERE h.id = $1 AND h.user_id = $2
        ORDER BY c.completed_date DESC`,
-      [id]
+      [id, userId]
     );
     
     if (result.rows.length === 0) {
@@ -476,8 +517,9 @@ app.get('/api/history/:id', async (req, res) => {
 });
 
 // Get calendar data for a specific month
-app.get('/api/calendar', async (req, res) => {
+app.get('/api/calendar', ensureAuthenticated, async (req, res) => {
   const { year, month } = req.query;
+  const userId = req.user.id;
   
   if (!year || !month) {
     return res.status(400).json({ error: 'Year and month are required' });
@@ -499,9 +541,9 @@ app.get('/api/calendar', async (req, res) => {
       `SELECT c.completed_date::text as completed_date, h.name 
        FROM completions c 
        JOIN habits h ON c.habit_id = h.id 
-       WHERE c.completed_date >= $1 AND c.completed_date <= $2 
+       WHERE c.completed_date >= $1 AND c.completed_date <= $2 AND h.user_id = $3
        ORDER BY c.completed_date, h.name`,
-      [startDate, endDate]
+      [startDate, endDate, userId]
     );
     
     // Group by date
@@ -522,14 +564,17 @@ app.get('/api/calendar', async (req, res) => {
 });
 
 // Export to CSV
-app.get('/export', async (req, res) => {
+app.get('/export', ensureAuthenticated, async (req, res) => {
+  const userId = req.user.id;
+  
   try {
     const result = await pool.query(`
       SELECT h.name, h.created_at, c.completed_date
       FROM habits h
       LEFT JOIN completions c ON h.id = c.habit_id
+      WHERE h.user_id = $1
       ORDER BY h.name, c.completed_date DESC
-    `);
+    `, [userId]);
     
     // Build CSV
     let csv = 'Habit Name,Created At,Completed Date\n';
@@ -565,7 +610,9 @@ app.get('/api/version', (req, res) => {
 });
 
 // Check for pending reminders
-app.get('/api/reminders', async (req, res) => {
+app.get('/api/reminders', ensureAuthenticated, async (req, res) => {
+  const userId = req.user.id;
+  
   try {
     const now = new Date();
     const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -576,10 +623,11 @@ app.get('/api/reminders', async (req, res) => {
       `SELECT h.id, h.name, h.reminder_time 
        FROM habits h
        LEFT JOIN completions c ON h.id = c.habit_id AND c.completed_date = $1
-       WHERE h.reminder_time IS NOT NULL 
-       AND h.reminder_time <= $2::time
+       WHERE h.user_id = $2
+       AND h.reminder_time IS NOT NULL 
+       AND h.reminder_time <= $3::time
        AND c.id IS NULL`,
-      [today, currentTime]
+      [today, userId, currentTime]
     );
     
     res.json(result.rows);
