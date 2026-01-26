@@ -8,7 +8,30 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
 const app = express();
 
-// 1. CONFIGURATION (Order is important!)
+// 1. DATABASE CONNECTION (Must be before session config)
+const pool = new Pool({
+  user: process.env.POSTGRES_USER || 'postgres',
+  host: process.env.POSTGRES_HOST || 'postgres-service',
+  database: process.env.POSTGRES_DB || 'habitdb',
+  password: process.env.POSTGRES_PASSWORD || 'mysecretpassword',
+  port: 5432,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
+
+pool.on('error', (err) => {
+  console.error('Unexpected database error:', err);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received, closing database pool...');
+  await pool.end();
+  process.exit(0);
+});
+
+// 2. CONFIGURATION (Order is important!)
 // Explicitly tell Express where the views folder is using an absolute path
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
@@ -39,29 +62,6 @@ app.use(session({
 // Passport initialization
 app.use(passport.initialize());
 app.use(passport.session());
-
-// 2. DATABASE CONNECTION
-const pool = new Pool({
-  user: process.env.POSTGRES_USER || 'postgres',
-  host: process.env.POSTGRES_HOST || 'postgres-service',
-  database: process.env.POSTGRES_DB || 'habitdb',
-  password: process.env.POSTGRES_PASSWORD || 'mysecretpassword',
-  port: 5432,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
-
-pool.on('error', (err) => {
-  console.error('Unexpected database error:', err);
-});
-
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, closing database pool...');
-  await pool.end();
-  process.exit(0);
-});
 
 // Helper function to get local date in YYYY-MM-DD format
 function getLocalDate(date = new Date()) {
